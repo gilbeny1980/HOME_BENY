@@ -9,6 +9,8 @@ PWA בעברית (RTL): משימות, לוח שנה עם תזכורות, אנש�
 4. **Environment Variables ב-Vercel** (ואז Redeploy):
    - `FAMILY_CODE` – קוד משפחתי סודי (כל בני המשפחה מזינים אותו באפליקציה בפעם הראשונה)
    - `ADMIN_CODE` – סיסמת מסך הניהול (משימות). אם לא מוגדר, נעשה שימוש ב-`FAMILY_CODE`
+   - `ADMIN_EMAIL` – המייל שאליו נשלח קוד חד־פעמי כששוכחים את סיסמת הניהול
+   - `RESEND_API_KEY` – מפתח מ-resend.com (חשבון שנרשם עם אותו מייל; במסלול החינמי ללא דומיין אפשר לשלוח רק לכתובת הזו)
    - `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (למשל `mailto:you@example.com`)
    - `CRON_SECRET` – מחרוזת אקראית
 5. **GitHub → Settings → Secrets → Actions**: `CRON_SECRET` (אותו ערך) ו-`SITE_URL` (למשל `https://your-app.vercel.app`). ה-workflow `reminders.yml` בודק תזכורות כל 5 דקות.

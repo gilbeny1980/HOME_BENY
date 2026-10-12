@@ -2,7 +2,7 @@ const { getJSON, setJSON, merge, auth, isAdmin } = require('./_lib');
 module.exports = async (req, res) => {
   if (!auth(req, res)) return;
   try {
-    const admin = isAdmin(req);
+    const admin = await isAdmin(req);
     const cur = (await getJSON('bny:data')) || {};
     let out = merge(cur, {});
     if (req.method === 'POST') {

@@ -97,6 +97,13 @@
       <p class="mut">הכנס סיסמת ניהול כדי לראות ולערוך משימות.</p>
       <input name="pw" type="password" placeholder="סיסמה" autocomplete="current-password" required>
       <button class="btn">כניסה</button>
+      <button type="button" id="forgotBtn" class="linkBtn">שכחתי סיסמה – שלח קוד למייל</button>
+    </form>
+    <form id="otpForm" class="card form" hidden>
+      <h3>קוד חד־פעמי</h3>
+      <p class="mut">שלחנו קוד בן 6 ספרות למייל של המנהל. הוא תקף 10 דקות.</p>
+      <input name="code" inputmode="numeric" maxlength="6" placeholder="______" dir="ltr" required autocomplete="one-time-code">
+      <button class="btn">אישור</button>
     </form>
     <div id="adminBody" hidden>
       <div class="adminBar"><h3>ניהול משימות</h3><button id="lockBtn" class="chip dark">🔒 נעל</button></div>

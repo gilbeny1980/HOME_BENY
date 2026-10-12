@@ -9,6 +9,9 @@ function init() {
     'CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT)',
     'CREATE TABLE IF NOT EXISTS subs (endpoint TEXT PRIMARY KEY, data TEXT)',
     'CREATE TABLE IF NOT EXISTS fired (k TEXT PRIMARY KEY)',
+    'CREATE TABLE IF NOT EXISTS otp (id INTEGER PRIMARY KEY, h TEXT, exp INTEGER, tries INTEGER)',
+    'CREATE TABLE IF NOT EXISTS otp_log (ts INTEGER)',
+    'CREATE TABLE IF NOT EXISTS sessions (h TEXT PRIMARY KEY, exp INTEGER)',
   ]).catch(e => { ready = null; throw e; });
   return ready;
 }
@@ -32,8 +35,14 @@ function auth(req, res) {
   if (!code || req.headers['x-family-code'] !== code) { res.status(401).json({ error: 'bad code' }); return false; }
   return true;
 }
-function isAdmin(req) {
+const sha = v => require('crypto').createHash('sha256').update(String(v)).digest('hex');
+// Admin = the ADMIN_CODE password, or a session token issued after an email one-time code
+async function isAdmin(req) {
+  const given = req.headers['x-admin-code'];
+  if (!given) return false;
   const code = process.env.ADMIN_CODE || process.env.FAMILY_CODE;
-  return !!code && req.headers['x-admin-code'] === code;
+  if (code && given === code) return true;
+  const r = await exec('SELECT exp FROM sessions WHERE h = ?', [sha(given)]);
+  return !!r.rows[0] && Number(r.rows[0].exp) > Date.now();
 }
-module.exports = { isAdmin, subPut, subsAll, subDel, markFired, getJSON, setJSON, merge, auth };
+module.exports = { exec, sha, isAdmin, subPut, subsAll, subDel, markFired, getJSON, setJSON, merge, auth };

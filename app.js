@@ -168,12 +168,22 @@ function renderNotes(){
 }
 $('#noteList').onclick=e=>{const w=e.target.closest('[data-w]');if(w)return open(waze(w.dataset.w),'_blank');const b=e.target.closest('.del');if(b&&confirm('למחוק?')){const n=db.notes.find(n=>n.id===b.dataset.id);n.del=1;touch(n);save();renderNotes()}};
 
-function renderAdmin(){const on=!!adminPw;$('#loginForm').hidden=on;$('#adminBody').hidden=!on;if(on)renderTasks()}
+function renderAdmin(){const on=!!adminPw;$('#loginForm').hidden=on;if(on)$('#otpForm').hidden=true;$('#adminBody').hidden=!on;if(on)renderTasks()}
 $('#loginForm').onsubmit=async e=>{e.preventDefault();const pw=e.target.pw.value;
   if(!localStorage.getItem(CODE_KEY))await sync();
   try{const r=await fetch('/api/auth',{headers:{...hdr(),'x-admin-code':pw}});
     if(!r.ok)return toast('סיסמה שגויה');
     adminPw=pw;localStorage.setItem('bny-admin',pw);e.target.reset();renderAdmin();sync()}catch{toast('אין חיבור לשרת')}};
+$('#forgotBtn').onclick=async()=>{
+  if(!localStorage.getItem(CODE_KEY))await sync();
+  try{const r=await fetch('/api/otp',{method:'POST',headers:hdr(),body:JSON.stringify({action:'request'})});
+    if(r.status===429)return toast('יותר מדי בקשות, נסה בעוד כמה דקות');
+    if(!r.ok)return toast('שליחת המייל נכשלה');
+    $('#otpForm').hidden=false;toast('הקוד נשלח למייל')}catch{toast('אין חיבור לשרת')}};
+$('#otpForm').onsubmit=async e=>{e.preventDefault();
+  try{const r=await fetch('/api/otp',{method:'POST',headers:hdr(),body:JSON.stringify({action:'verify',code:e.target.code.value})});
+    if(!r.ok)return toast('קוד שגוי או שפג תוקפו');
+    const {token}=await r.json();adminPw=token;localStorage.setItem('bny-admin',token);e.target.reset();e.target.hidden=true;renderAdmin();sync()}catch{toast('אין חיבור לשרת')}};
 $('#lockBtn').onclick=()=>{adminPw='';localStorage.removeItem('bny-admin');renderAdmin()};
 function renderAll(){renderKids();renderAdmin();renderCal();renderContacts();renderNotes()}
 renderAll();updNotifBtn();checkReminders();sync();
