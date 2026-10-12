@@ -43,14 +43,10 @@ function renderToday(){
 }
 tick();setInterval(tick,1000);setInterval(()=>{renderToday();renderKids()},30000);
 function renderKids(){
-  const today=iso(new Date());
-  $('#kids').innerHTML=`<button class="kid home ${!kidFilter&&curTab==='home'?'on':''}" style="--c:#6d4aff" data-k="">🏠 בית</button>`+KIDS.map(([n,c])=>{const cnt=live(db.events).filter(e=>e.date===today&&e.kid===n).length;
-    return `<button class="kid ${kidFilter===n?'on':''} ${myName===n?'me':''}" style="--c:${c}" data-k="${n}"><span class="nm">${n}</span>${cnt?`<b class="bd">${cnt}</b>`:''}</button>`}).join('');
   const opts='<option value="">כולם</option>'+KIDS.map(k=>`<option>${k[0]}</option>`).join('');
   $('#kidChecks').innerHTML=KIDS.map(([n,c])=>`<label class="ck" style="--c:${c}"><input type="checkbox" name="kids" value="${n}"><span>${n}</span></label>`).join('');
   $('#kidSel').innerHTML=opts;$('#whoSel').innerHTML=opts;
 }
-$('#kids').onclick=e=>{const b=e.target.closest('.kid');if(!b)return;const k=b.dataset.k;if(!k){kidFilter='';showTab('home')}else kidFilter=kidFilter===k?'':k;renderKids();renderCal();renderContacts()};
 
 // sheet
 function sheet(title,html){$('#sheetTitle').textContent=title;$('#sheetBody').innerHTML=html;$('#sheet').hidden=false}
