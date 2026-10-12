@@ -20,6 +20,7 @@
 <header class="top">
   <div class="brand"><img src="icon.svg" alt="" width="38" height="38"><span>בן יהודה</span></div>
   <div class="topBtns">
+    <button id="meBtn" class="chip" hidden></button>
     <button id="installBtn" class="chip" hidden>📲 התקנה</button>
     <button id="notifBtn" class="chip">🔔 תזכורות</button>
   </div>
@@ -80,7 +81,8 @@
       <input name="phone" type="tel" placeholder="טלפון" dir="ltr">
       <input name="email" type="email" placeholder="אימייל" dir="ltr">
       <input name="address" placeholder="כתובת (עיר, רחוב ומספר)">
-      <input name="note" placeholder="הערה קצרה (קשר משפחתי…)">
+      <input name="note" placeholder="קשר משפחתי (סבתא, גננת…)">
+      <textarea name="info" rows="4" placeholder="📝 הערות: הסבר על המיקום, קוד כניסה, קומה, דירה…"></textarea>
       <div class="lbl">שייך לילדות (אפשר כמה)</div>
       <div id="kidChecks" class="checks"></div>
       <button class="btn" id="contactSave">＋ שמור</button>
@@ -88,26 +90,13 @@
     </form>
   </section>
 
-  <!-- הערות -->
-  <section id="tab-notes" class="tab">
-    <form id="noteForm" class="card form">
-      <input name="title" placeholder="כותרת (למשל: חניה אצל סבתא)" required>
-      <textarea name="text" rows="4" placeholder="הסבר על המיקום, קוד כניסה, קומה, דירה…"></textarea>
-      <select name="contact" id="noteContact"></select>
-      <button class="btn">＋ שמור הערה</button>
-    </form>
-    <ul id="noteList" class="list"></ul>
-  </section>
-
   <!-- ניהול (מוגן בסיסמה) -->
   <section id="tab-admin" class="tab">
-    <form id="loginForm" class="card form">
-      <h3>🔐 ניהול משימות</h3>
-      <p class="mut">הכנס סיסמת ניהול כדי לראות ולערוך משימות.</p>
-      <input name="pw" type="password" placeholder="סיסמה" autocomplete="current-password" required>
-      <button class="btn">כניסה</button>
-      <button type="button" id="forgotBtn" class="linkBtn">שכחתי סיסמה – שלח קוד למייל</button>
-    </form>
+    <div id="adminGate" class="card form">
+      <h3>🔐 ניהול</h3>
+      <p class="mut">הכניסה לניהול (משימות, משתמשים וסיסמה) היא רק למנהל. הקוד נשלח למייל המנהל.</p>
+      <button class="btn" id="sendOtp" type="button">שלח קוד כניסה למייל</button>
+    </div>
     <form id="otpForm" class="card form" hidden>
       <h3>קוד חד־פעמי</h3>
       <p class="mut">שלחנו קוד בן 6 ספרות למייל של המנהל. הוא תקף 10 דקות.</p>
@@ -115,7 +104,23 @@
       <button class="btn">אישור</button>
     </form>
     <div id="adminBody" hidden>
-      <div class="adminBar"><h3>ניהול משימות</h3><button id="lockBtn" class="chip dark">🔒 נעל</button></div>
+      <div class="adminBar"><h3>ניהול</h3><button id="lockBtn" class="chip dark">🔒 נעל</button></div>
+      <div class="card">
+        <h3 style="margin-top:0">👥 משתמשים באתר</h3>
+        <p class="mut">כל אחד נכנס עם שם המשתמש שלו והסיסמה המשפחתית.</p>
+        <ul id="userList" class="list"></ul>
+        <form id="userForm" class="form">
+          <div class="row"><input name="u" placeholder="שם משתמש (באנגלית)" dir="ltr" required><input name="n" placeholder="שם להצגה" required></div>
+          <button class="btn">＋ הוסף / עדכן משתמש</button>
+        </form>
+      </div>
+      <form id="pwForm" class="card form">
+        <h3>🔑 שינוי סיסמת כניסה לאתר</h3>
+        <p class="mut">אחרי השינוי כולם יתבקשו להתחבר מחדש עם הסיסמה החדשה.</p>
+        <input name="pw" type="text" placeholder="סיסמה חדשה (לפחות 6 תווים)" minlength="6" dir="ltr" required>
+        <button class="btn">שמור סיסמה חדשה</button>
+      </form>
+      <h3 class="sec">ניהול משימות</h3>
       <form id="taskForm" class="card form">
         <input name="title" placeholder="משימה חדשה…" required>
         <div class="row">
@@ -137,10 +142,26 @@
 <nav class="tabs">
   <button data-t="home" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg><em>בית</em></button>
   <button data-t="contacts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><circle cx="17.5" cy="9" r="2.5"/><path d="M17 14.2c2.6.2 4.5 2 4.5 4.8"/></svg><em>אנשי קשר</em></button>
-  <button data-t="notes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h10l4 4v14H5z"/><path d="M14 3v5h5M8 13h8M8 17h6"/></svg><em>הערות</em></button>
   <button data-t="admin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 018 0v3"/></svg><em>ניהול</em></button>
 </nav>
 
+<div id="login" class="loginScreen" hidden>
+  <div class="loginBox">
+    <img src="icon.svg" alt="" width="72" height="72">
+    <h2>משפחת בן יהודה</h2>
+    <form id="loginFormMain" class="form">
+      <input name="username" placeholder="שם משתמש (למשל: gil)" dir="ltr" autocapitalize="none" autocomplete="username" required>
+      <input name="password" type="password" placeholder="סיסמה" dir="ltr" autocomplete="current-password" required>
+      <button class="btn">כניסה</button>
+    </form>
+    <button id="mgrBtn" class="linkBtn" type="button">כניסת מנהל (קוד למייל)</button>
+    <form id="loginOtp" class="form" hidden>
+      <p class="mut">שלחנו קוד בן 6 ספרות למייל של המנהל.</p>
+      <input name="code" inputmode="numeric" maxlength="6" placeholder="______" dir="ltr" required autocomplete="one-time-code">
+      <button class="btn">אישור</button>
+    </form>
+  </div>
+</div>
 <div id="iosHint" class="toast hint" hidden>באייפון: לחצו על ⬆️ שיתוף ← "הוסף למסך הבית"</div>
 <div id="sheet" class="sheet" hidden>
   <div class="sheetBox"><h3 id="sheetTitle"></h3><div id="sheetBody"></div><button class="btn ghost" id="sheetClose">סגור</button></div>

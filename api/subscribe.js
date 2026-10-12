@@ -1,6 +1,6 @@
 const { subPut, auth } = require('./_lib');
 module.exports = async (req, res) => {
-  if (!auth(req, res)) return;
+  if (!(await auth(req, res))) return;
   if (req.method === 'GET') return res.status(200).json({ key: process.env.VAPID_PUBLIC_KEY || '' });
   try {
     const sub = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;

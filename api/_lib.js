@@ -11,7 +11,8 @@ function init() {
     'CREATE TABLE IF NOT EXISTS fired (k TEXT PRIMARY KEY)',
     'CREATE TABLE IF NOT EXISTS otp (id INTEGER PRIMARY KEY, h TEXT, exp INTEGER, tries INTEGER)',
     'CREATE TABLE IF NOT EXISTS otp_log (ts INTEGER)',
-    'CREATE TABLE IF NOT EXISTS sessions (h TEXT PRIMARY KEY, exp INTEGER)',
+    'CREATE TABLE IF NOT EXISTS sess (h TEXT PRIMARY KEY, exp INTEGER, role TEXT, uname TEXT)',
+    'CREATE TABLE IF NOT EXISTS login_log (ts INTEGER)',
   ]).catch(e => { ready = null; throw e; });
   return ready;
 }
@@ -35,14 +36,48 @@ function auth(req, res) {
   if (!code || req.headers['x-family-code'] !== code) { res.status(401).json({ error: 'bad code' }); return false; }
   return true;
 }
-const sha = v => require('crypto').createHash('sha256').update(String(v)).digest('hex');
-// Admin = the ADMIN_CODE password, or a session token issued after an email one-time code
-async function isAdmin(req) {
-  const given = req.headers['x-admin-code'];
-  if (!given) return false;
-  const code = process.env.ADMIN_CODE || process.env.FAMILY_CODE;
-  if (code && given === code) return true;
-  const r = await exec('SELECT exp FROM sessions WHERE h = ?', [sha(given)]);
-  return !!r.rows[0] && Number(r.rows[0].exp) > Date.now();
+const crypto = require('crypto');
+const sha = v => crypto.createHash('sha256').update(String(v)).digest('hex');
+
+// ---- sessions: role 'user' (family login) or 'admin' (email one-time code) ----
+async function newSession(role, uname, days) {
+  const token = crypto.randomBytes(32).toString('hex');
+  await exec('DELETE FROM sess WHERE exp < ?', [Date.now()]);
+  await exec('INSERT INTO sess (h, exp, role, uname) VALUES (?, ?, ?, ?)', [sha(token), Date.now() + days * 86400000, role, uname]);
+  return token;
 }
-module.exports = { exec, sha, isAdmin, subPut, subsAll, subDel, markFired, getJSON, setJSON, merge, auth };
+async function getSession(token) {
+  if (!token) return null;
+  const r = await exec('SELECT exp, role, uname FROM sess WHERE h = ?', [sha(token)]);
+  const row = r.rows[0];
+  return row && Number(row.exp) > Date.now() ? { role: row.role, uname: row.uname } : null;
+}
+// any logged-in session (user or admin)
+async function auth(req, res) {
+  const s = await getSession(req.headers['x-token']);
+  if (!s) { res.status(401).json({ error: 'login required' }); return false; }
+  req.session = s;
+  return true;
+}
+async function isAdmin(req) {
+  const s = await getSession(req.headers['x-admin-code']);
+  return !!s && s.role === 'admin';
+}
+
+// ---- users & shared family password ----
+const DEFAULT_USERS = [{ u: 'gil', n: 'גיל' }, { u: 'adva', n: 'אדוה' }, { u: 'linoy', n: 'לינוי' }, { u: 'romi', n: 'רומי' }, { u: 'aline', n: 'אלין' }];
+async function getUsers() { return (await getJSON('bny:users')) || DEFAULT_USERS; }
+const hashPw = (pw, salt) => crypto.scryptSync(String(pw), salt, 32).toString('hex');
+async function checkPassword(pw) {
+  const rec = await getJSON('bny:pw');
+  if (rec) return crypto.timingSafeEqual(Buffer.from(hashPw(pw, rec.salt)), Buffer.from(rec.h));
+  const init = process.env.FAMILY_CODE; // initial password until the manager changes it in the app
+  return !!init && String(pw) === init;
+}
+async function setPassword(pw) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  await setJSON('bny:pw', { salt, h: hashPw(pw, salt) });
+  await exec("DELETE FROM sess WHERE role = 'user'"); // everyone must log in again with the new password
+}
+
+module.exports = { exec, sha, isAdmin, newSession, getSession, getUsers, checkPassword, setPassword, subPut, subsAll, subDel, markFired, getJSON, setJSON, merge, auth };

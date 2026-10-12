@@ -3,16 +3,19 @@ const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const KEY='bny-data-v1';
 let db={tasks:[],events:[],contacts:[],notes:[],fired:{}};
 try{db=Object.assign(db,JSON.parse(localStorage.getItem(KEY)||'{}'))}catch{}
-const CODE_KEY='bny-code';
+let token=localStorage.getItem('bny-token')||'';
+let myName=localStorage.getItem('bny-name')||'';
 const KIDS=[['לינוי','#e0527a'],['רומי','#8e5bd6'],['אלין','#2f9e8f'],['גיל','#e8912d'],['אדוה','#3b82c4']];
 const kidColor=n=>(KIDS.find(k=>k[0]===n)||[])[1]||'#888';
 let kidFilter='';
-let adminPw=localStorage.getItem('bny-admin')||'';
+let adminTok=localStorage.getItem('bny-admin')||'';
 let syncT;
 db.events.forEach(e=>{if(!e.at)e.at=new Date(`${e.date}T${e.time}`).getTime()});
 // שינוי שם: אדה -> אדוה (נתונים קיימים)
 db.events.forEach(e=>{if(e.kid==='אדה')e.kid='אדוה'});db.tasks.forEach(t=>{if(t.who==='אדה')t.who='אדוה'});
 db.contacts.forEach(c=>{if((c.kids||[]).includes('אדה'))c.kids=c.kids.map(k=>k==='אדה'?'אדוה':k)});
+// העברת הערות ישנות אל איש הקשר
+if(!db.notesMigrated){for(const n of db.notes){if(n.del||!n.contact)continue;const c=db.contacts.find(c=>c.id===n.contact);if(c&&!(c.info||'').includes(n.text||'')){c.info=((c.info?c.info+'\n':'')+(n.title?n.title+': ':'')+(n.text||'')).trim();c.u=Date.now()}}db.notesMigrated=1}
 const save=()=>{localStorage.setItem(KEY,JSON.stringify(db));clearTimeout(syncT);syncT=setTimeout(sync,600)};
 const touch=o=>{o.u=Date.now();return o};
 const live=a=>a.filter(x=>!x.del);
@@ -30,7 +33,7 @@ function tick(){const d=new Date();
   $('#dateLine').textContent=d.toLocaleDateString('he-IL',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}
 function renderToday(){
   const d=new Date(),h=d.getHours();
-  $('#greet').textContent=(h<5?'לילה טוב':h<12?'בוקר טוב':h<18?'צהריים טובים':h<22?'ערב טוב':'לילה טוב')+' משפחת בן יהודה';
+  $('#greet').textContent=(h<5?'לילה טוב':h<12?'בוקר טוב':h<18?'צהריים טובים':h<22?'ערב טוב':'לילה טוב')+' '+(myName||'משפחת בן יהודה');
   const t=iso(d),hm=`${pad(h)}:${pad(d.getMinutes())}`;
   const ev=live(db.events).filter(e=>e.date===t).sort((a,b)=>a.time.localeCompare(b.time));
   const nxt=ev.find(e=>e.time>=hm);
@@ -110,17 +113,17 @@ function checkReminders(){
     if(now>=fire&&now<at+3600000&&!db.fired[e.id]){db.fired[e.id]=1;ch=true;
       notify('תזכורת: '+e.title,`${fmtDate(e.date)} בשעה ${e.time}`)}}
   const today=iso(new Date());
-  if(!db.fired['d'+today]&&new Date().getHours()>=8){const n=!adminPw?0:live(db.tasks).filter(t=>!t.done&&t.due&&t.due<=today).length;
+  if(!db.fired['d'+today]&&new Date().getHours()>=8){const n=!adminTok?0:live(db.tasks).filter(t=>!t.done&&t.due&&t.due<=today).length;
     if(n){db.fired['d'+today]=1;ch=true;notify('משימות להיום',`יש ${n} משימות פתוחות להיום או באיחור`)}}
   if(ch)save();
 }
 function askNotif(){if(!('Notification' in window))return toast('הדפדפן לא תומך בהתראות');Notification.requestPermission().then(()=>{updNotifBtn();enablePush()})}
 let pushOn=localStorage.getItem('bny-push')==='1';
 const b64=s=>{s=(s+'='.repeat((4-s.length%4)%4)).replace(/-/g,'+').replace(/_/g,'/');return Uint8Array.from(atob(s),c=>c.charCodeAt(0))};
-const hdr=()=>({'x-family-code':localStorage.getItem(CODE_KEY)||'','x-admin-code':adminPw,'content-type':'application/json'});
+const hdr=()=>({'x-token':token,'x-admin-code':adminTok,'content-type':'application/json'});
 async function enablePush(){
   try{
-    if(!('PushManager' in window)||Notification.permission!=='granted'||!localStorage.getItem(CODE_KEY))return;
+    if(!('PushManager' in window)||Notification.permission!=='granted'||!token)return;
     const {key}=await (await fetch('/api/subscribe',{headers:hdr()})).json();if(!key)return;
     const reg=await navigator.serviceWorker.ready;
     const sub=(await reg.pushManager.getSubscription())||await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64(key)});
@@ -131,16 +134,16 @@ async function enablePush(){
 let syncing=false;
 async function sync(){
   if(syncing)return;
-  let code=localStorage.getItem(CODE_KEY);
-  if(!code){code=prompt('קוד משפחתי לסנכרון בין המכשירים:');if(!code)return;localStorage.setItem(CODE_KEY,code.trim())}
+  if(!token){showLogin();return}
   syncing=true;
   try{
     const {tasks,events,contacts,notes}=db;
-    const r=await fetch('/api/data',{method:'POST',headers:hdr(),body:JSON.stringify(adminPw?{tasks,events,contacts,notes}:{events,contacts,notes})});
-    if(r.status===401){localStorage.removeItem(CODE_KEY);toast('קוד שגוי');return}
+    const body=adminTok?{tasks,events,contacts,notes}:{events,contacts,notes};
+    const r=await fetch('/api/data',{method:'POST',headers:hdr(),body:JSON.stringify(body)});
+    if(r.status===401){logout(true);return}
     if(!r.ok)return;
     const m=await r.json();
-    if(JSON.stringify(adminPw?{tasks,events,contacts,notes}:{events,contacts,notes})!==JSON.stringify(m)){Object.assign(db,m);localStorage.setItem(KEY,JSON.stringify(db));renderAll()}
+    if(JSON.stringify(body)!==JSON.stringify(m)){Object.assign(db,m);localStorage.setItem(KEY,JSON.stringify(db));renderAll()}
     enablePush();
   }catch(e){}finally{syncing=false}
 }
@@ -154,15 +157,13 @@ setInterval(checkReminders,30000);document.addEventListener('visibilitychange',c
 function renderContacts(){
   const q=$('#search').value.trim().toLowerCase();
   const l=live(db.contacts).filter(c=>(!kidFilter||(c.kids||[]).includes(kidFilter))&&(!q||(c.name+c.phone+c.address+(c.email||'')).toLowerCase().includes(q))).sort((a,b)=>a.name.localeCompare(b.name,'he'));
-  $('#contactList').innerHTML=l.length?l.map(c=>`<li class="item" data-id="${c.id}"><div class="avatar">${esc(c.name[0])}</div><div class="main"><b>${esc(c.name)}</b><small>${esc(c.phone)} ${c.note?'· '+esc(c.note):''}</small><div>${(c.kids||[]).map(k=>`<span class="tag" style="--c:${kidColor(k)}">${esc(k)}</span>`).join('')}</div>${c.address?`<br><button class="addr" data-w="${c.id}">📍 ${esc(c.address)}</button>`:''}</div>${c.address?`<button class="wazeBtn" data-w="${c.id}" aria-label="Waze">🚗<span>Waze</span></button>`:''}<button class="del" data-x="${c.id}">🗑</button></li>`).join(''):'<li class="empty">אין אנשי קשר</li>';
-  const sel=$('#noteContact');const v=sel.value;
-  sel.innerHTML='<option value="">ללא איש קשר</option>'+live(db.contacts).map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');sel.value=v;
+  $('#contactList').innerHTML=l.length?l.map(c=>`<li class="item" data-id="${c.id}"><div class="avatar">${esc(c.name[0])}</div><div class="main"><b>${esc(c.name)}</b><small>${esc(c.phone)} ${c.note?'· '+esc(c.note):''}</small>${c.info?`<p class="info">📝 ${esc(c.info)}</p>`:''}<div>${(c.kids||[]).map(k=>`<span class="tag" style="--c:${kidColor(k)}">${esc(k)}</span>`).join('')}</div>${c.address?`<br><button class="addr" data-w="${c.id}">📍 ${esc(c.address)}</button>`:''}</div>${c.address?`<button class="wazeBtn" data-w="${c.id}" aria-label="Waze">🚗<span>Waze</span></button>`:''}<button class="del" data-x="${c.id}">🗑</button></li>`).join(''):'<li class="empty">אין אנשי קשר</li>';
 }
 $('#search').oninput=renderContacts;
 let editId='';
 function endEdit(){editId='';$('#contactForm').reset();$('#contactForm h3').textContent='איש קשר חדש';$('#contactSave').textContent='＋ שמור';$('#contactCancel').hidden=true}
 function editContact(c){editId=c.id;const f=$('#contactForm');
-  for(const k of ['name','phone','email','address','note'])f.elements[k].value=c[k]||'';
+  for(const k of ['name','phone','email','address','note','info'])f.elements[k].value=c[k]||'';
   $$('#kidChecks input').forEach(i=>i.checked=(c.kids||[]).includes(i.value));
   f.querySelector('h3').textContent='עריכת איש קשר';$('#contactSave').textContent='שמור שינויים';$('#contactCancel').hidden=false;
   f.scrollIntoView({behavior:'smooth',block:'center'})}
@@ -174,43 +175,55 @@ $('#contactList').onclick=e=>{
   const x=e.target.closest('[data-x]');if(x){if(confirm('למחוק?')){const c=db.contacts.find(c=>c.id===x.dataset.x);c.del=1;touch(c);save();renderContacts()}return}
   const w=e.target.closest('[data-w]');if(w){const c=db.contacts.find(c=>c.id===w.dataset.w);open(waze(c.address),'_blank');return}
   const it=e.target.closest('.item');if(!it)return;const c=db.contacts.find(c=>c.id===it.dataset.id);
-  const notes=live(db.notes).filter(n=>n.contact===c.id);
   let h=c.address?`<a class="act waze" href="${waze(c.address)}" target="_blank" rel="noopener">🚗 <span><b>נווט ב-Waze</b><br><small>${esc(c.address)}</small></span></a>`:`<div class="act" style="opacity:.7">📍 אין כתובת – לחץ "ערוך" כדי להוסיף</div>`;
+  if(c.info)h+=`<div class="act info2">📝 <span>${esc(c.info)}</span></div>`;
   if(c.phone)h+=`<a class="act" href="tel:${esc(c.phone)}">📞 התקשר ${esc(c.phone)}</a><a class="act" href="sms:${esc(c.phone)}">💬 שלח SMS</a><a class="act" href="https://wa.me/${intl(c.phone)}" target="_blank">🟢 וואטסאפ</a>`;
   if(c.email)h+=`<a class="act" href="mailto:${esc(c.email)}">✉️ שלח מייל ${esc(c.email)}</a>`;
-  if(notes.length)h+=notes.map(n=>`<div class="act">📝 <span><b>${esc(n.title)}</b><br>${esc(n.text)}</span></div>`).join('');
   h+=`<button class="act" data-edit="${c.id}">✏️ ערוך איש קשר</button>`;
   sheet(c.name,h);
   $('#sheetBody [data-edit]').onclick=()=>{$('#sheet').hidden=true;editContact(c)};
 };
 
-// notes
-$('#noteForm').onsubmit=e=>{e.preventDefault();const f=Object.fromEntries(new FormData(e.target));db.notes.unshift(touch({id:uid(),...f}));save();e.target.reset();renderNotes()};
-function renderNotes(){
-  const nl=live(db.notes).sort((a,b)=>b.u-a.u);$('#noteList').innerHTML=nl.length?nl.map(n=>{const c=live(db.contacts).find(c=>c.id===n.contact);
-    return `<li class="item note"><div class="main"><b>${esc(n.title)}</b>${c?`<small>👤 ${esc(c.name)}</small>`:''}<p class="noteText">${esc(n.text)}</p>${c&&c.address?`<button class="addr" data-w="${esc(c.address)}">📍 נווט ב-Waze</button>`:''}</div><button class="del" data-id="${n.id}">🗑</button></li>`}).join(''):'<li class="empty">אין הערות</li>';
-}
-$('#noteList').onclick=e=>{const w=e.target.closest('[data-w]');if(w)return open(waze(w.dataset.w),'_blank');const b=e.target.closest('.del');if(b&&confirm('למחוק?')){const n=db.notes.find(n=>n.id===b.dataset.id);n.del=1;touch(n);save();renderNotes()}};
 
-function renderAdmin(){const on=!!adminPw;$('#loginForm').hidden=on;if(on)$('#otpForm').hidden=true;$('#adminBody').hidden=!on;if(on)renderTasks()}
-$('#loginForm').onsubmit=async e=>{e.preventDefault();const pw=e.target.pw.value;
-  if(!localStorage.getItem(CODE_KEY))await sync();
-  try{const r=await fetch('/api/auth',{headers:{...hdr(),'x-admin-code':pw}});
-    if(!r.ok)return toast('סיסמה שגויה');
-    adminPw=pw;localStorage.setItem('bny-admin',pw);e.target.reset();renderAdmin();sync()}catch{toast('אין חיבור לשרת')}};
-$('#forgotBtn').onclick=async()=>{
-  if(!localStorage.getItem(CODE_KEY))await sync();
+function renderAdmin(){const on=!!adminTok;$('#adminGate').hidden=on;if(on)$('#otpForm').hidden=true;$('#adminBody').hidden=!on;if(on){renderTasks();loadUsers()}}
+async function requestOtp(){
   try{const r=await fetch('/api/otp',{method:'POST',headers:hdr(),body:JSON.stringify({action:'request'})});
-    if(r.status===429)return toast('יותר מדי בקשות, נסה בעוד כמה דקות');
-    if(!r.ok)return toast('שליחת המייל נכשלה');
-    $('#otpForm').hidden=false;toast('הקוד נשלח למייל')}catch{toast('אין חיבור לשרת')}};
-$('#otpForm').onsubmit=async e=>{e.preventDefault();
-  try{const r=await fetch('/api/otp',{method:'POST',headers:hdr(),body:JSON.stringify({action:'verify',code:e.target.code.value})});
-    if(!r.ok)return toast('קוד שגוי או שפג תוקפו');
-    const {token}=await r.json();adminPw=token;localStorage.setItem('bny-admin',token);e.target.reset();e.target.hidden=true;renderAdmin();sync()}catch{toast('אין חיבור לשרת')}};
-$('#lockBtn').onclick=()=>{adminPw='';localStorage.removeItem('bny-admin');renderAdmin()};
-function renderAll(){renderToday();renderKids();renderAdmin();renderCal();renderContacts();renderNotes()}
-renderAll();updNotifBtn();checkReminders();sync();
+    if(r.status===429){toast('יותר מדי בקשות, נסה בעוד כמה דקות');return false}
+    if(!r.ok){toast('שליחת המייל נכשלה');return false}
+    toast('הקוד נשלח למייל המנהל');return true}catch{toast('אין חיבור לשרת');return false}}
+async function verifyOtp(code){
+  try{const r=await fetch('/api/otp',{method:'POST',headers:hdr(),body:JSON.stringify({action:'verify',code})});
+    if(!r.ok){toast('קוד שגוי או שפג תוקפו');return null}
+    return await r.json()}catch{toast('אין חיבור לשרת');return null}}
+$('#sendOtp').onclick=async()=>{if(await requestOtp())$('#otpForm').hidden=false};
+$('#otpForm').onsubmit=async e=>{e.preventDefault();const t=await verifyOtp(e.target.code.value);if(!t)return;
+  adminTok=t.token;localStorage.setItem('bny-admin',adminTok);e.target.reset();renderAdmin();sync()};
+$('#lockBtn').onclick=()=>{adminTok='';localStorage.removeItem('bny-admin');renderAdmin()};
+// users + password (manager)
+async function usersCall(body){
+  const r=await fetch('/api/users',{method:body?'POST':'GET',headers:hdr(),body:body?JSON.stringify(body):undefined});
+  if(!r.ok){toast(r.status===401?'אין הרשאת מנהל':'שגיאה');return null}return r.json()}
+async function loadUsers(){const d=await usersCall();if(d)renderUsers(d.users)}
+function renderUsers(us){$('#userList').innerHTML=us.map(u=>`<li class="item"><div class="avatar">${esc(u.n[0])}</div><div class="main"><b>${esc(u.n)}</b><small dir="ltr">${esc(u.u)}</small></div><button class="del" data-u="${esc(u.u)}">🗑</button></li>`).join('')}
+$('#userList').onclick=async e=>{const b=e.target.closest('[data-u]');if(!b||!confirm('להסיר את המשתמש?'))return;const d=await usersCall({action:'remove',u:b.dataset.u});if(d)renderUsers(d.users)};
+$('#userForm').onsubmit=async e=>{e.preventDefault();const f=Object.fromEntries(new FormData(e.target));const d=await usersCall({action:'save',...f});if(d){renderUsers(d.users);e.target.reset();toast('נשמר')}};
+$('#pwForm').onsubmit=async e=>{e.preventDefault();const d=await usersCall({action:'password',password:e.target.pw.value});if(d){e.target.reset();toast('הסיסמה שונתה – כולם יתחברו מחדש')}};
+// login screen
+function showLogin(){$('#login').hidden=false;$('#meBtn').hidden=true}
+function renderMe(){const b=$('#meBtn');b.hidden=!token;b.textContent='👤 '+(myName||'')}
+function logout(expired){token='';adminTok='';myName='';['bny-token','bny-admin','bny-name'].forEach(k=>localStorage.removeItem(k));renderAdmin();renderToday();showLogin();if(expired)toast('יש להתחבר מחדש')}
+function loggedIn(t,name){token=t;myName=name;localStorage.setItem('bny-token',t);localStorage.setItem('bny-name',name);$('#login').hidden=true;renderMe();renderToday();sync()}
+$('#loginFormMain').onsubmit=async e=>{e.preventDefault();const f=Object.fromEntries(new FormData(e.target));
+  try{const r=await fetch('/api/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(f)});
+    if(r.status===429)return toast('יותר מדי ניסיונות, נסה בעוד כמה דקות');
+    if(!r.ok)return toast('שם משתמש או סיסמה שגויים');
+    const d=await r.json();e.target.reset();loggedIn(d.token,d.name)}catch{toast('אין חיבור לשרת')}};
+$('#mgrBtn').onclick=async()=>{if(await requestOtp())$('#loginOtp').hidden=false};
+$('#loginOtp').onsubmit=async e=>{e.preventDefault();const t=await verifyOtp(e.target.code.value);if(!t)return;
+  adminTok=t.token;localStorage.setItem('bny-admin',adminTok);e.target.reset();e.target.hidden=true;renderAdmin();loggedIn(t.token,'מנהל')};
+$('#meBtn').onclick=()=>{sheet(myName||'משתמש','<button class="act" id="logoutBtn">🚪 התנתק</button>');$('#logoutBtn').onclick=()=>{$('#sheet').hidden=true;logout()}};
+function renderAll(){renderToday();renderKids();renderAdmin();renderCal();renderContacts()}
+renderAll();renderMe();updNotifBtn();checkReminders();sync();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 
 // התקנה כאפליקציה (אנדרואיד / אייפון)

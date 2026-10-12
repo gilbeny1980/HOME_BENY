@@ -1,8 +1,7 @@
 const crypto = require('crypto');
-const { auth, exec, sha } = require('./_lib');
+const { exec, sha, newSession } = require('./_lib');
 // Forgot admin password: email a 6-digit one-time code to ADMIN_EMAIL, then exchange it for a session token.
 module.exports = async (req, res) => {
-  if (!auth(req, res)) return;
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {};
     const now = Date.now();
@@ -35,10 +34,7 @@ module.exports = async (req, res) => {
         return res.status(401).json({ error: 'wrong code' });
       }
       await exec('DELETE FROM otp WHERE id = 1');
-      const token = crypto.randomBytes(32).toString('hex');
-      await exec('DELETE FROM sessions WHERE exp < ?', [now]);
-      await exec('INSERT INTO sessions (h, exp) VALUES (?, ?)', [sha(token), now + 90 * 86400000]);
-      return res.status(200).json({ token });
+      return res.status(200).json({ token: await newSession('admin', 'admin', 90), name: 'מנהל' });
     }
     res.status(400).json({ error: 'bad action' });
   } catch (e) { res.status(500).json({ error: String(e.message || e) }); }
