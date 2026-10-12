@@ -21,6 +21,8 @@ const getJSON = async k => { const r = await exec('SELECT v FROM kv WHERE k = ?'
 const setJSON = (k, v) => exec('INSERT INTO kv (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v', [k, JSON.stringify(v)]);
 const subPut = sub => exec('INSERT INTO subs (endpoint, data) VALUES (?, ?) ON CONFLICT(endpoint) DO UPDATE SET data = excluded.data', [sub.endpoint, JSON.stringify(sub)]);
 const subsAll = async () => (await exec('SELECT data FROM subs')).rows.map(r => JSON.parse(r.data));
+const subGet = async endpoint => { const r = await exec('SELECT data FROM subs WHERE endpoint = ?', [endpoint]); return r.rows[0] ? JSON.parse(r.rows[0].data) : null; };
+const subCount = async () => Number((await exec('SELECT COUNT(*) AS n FROM subs')).rows[0].n);
 const subDel = endpoint => exec('DELETE FROM subs WHERE endpoint = ?', [endpoint]);
 // true only the first time a key is marked (prevents duplicate reminders)
 const markFired = async k => (await exec('INSERT OR IGNORE INTO fired (k) VALUES (?)', [k])).rowsAffected > 0;
@@ -80,4 +82,4 @@ async function setPassword(pw) {
   await exec("DELETE FROM sess WHERE role = 'user'"); // everyone must log in again with the new password
 }
 
-module.exports = { exec, sha, isAdmin, newSession, getSession, getUsers, checkPassword, setPassword, subPut, subsAll, subDel, markFired, getJSON, setJSON, merge, auth };
+module.exports = { subGet, subCount, exec, sha, isAdmin, newSession, getSession, getUsers, checkPassword, setPassword, subPut, subsAll, subDel, markFired, getJSON, setJSON, merge, auth };

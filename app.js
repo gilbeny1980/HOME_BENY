@@ -115,19 +115,24 @@ function checkReminders(){
     if(n){db.fired['d'+today]=1;ch=true;notify('משימות להיום',`יש ${n} משימות פתוחות להיום או באיחור`)}}
   if(ch)save();
 }
-function askNotif(){if(!('Notification' in window))return toast('הדפדפן לא תומך בהתראות');Notification.requestPermission().then(()=>{updNotifBtn();enablePush()})}
+function askNotif(){if(!('Notification' in window))return toast('הדפדפן לא תומך בהתראות');Notification.requestPermission().then(()=>{updNotifBtn();enablePush(true)})}
 let pushOn=localStorage.getItem('bny-push')==='1';
 const b64=s=>{s=(s+'='.repeat((4-s.length%4)%4)).replace(/-/g,'+').replace(/_/g,'/');return Uint8Array.from(atob(s),c=>c.charCodeAt(0))};
 const hdr=()=>({'x-token':token,'x-admin-code':adminTok,'content-type':'application/json'});
-async function enablePush(){
+async function enablePush(verbose){
+  const say=m=>{if(verbose)toast(m)};
   try{
-    if(!('PushManager' in window)||Notification.permission!=='granted'||!token)return;
-    const {key}=await (await fetch('/api/subscribe',{headers:hdr()})).json();if(!key)return;
+    if(!('serviceWorker' in navigator)||!('PushManager' in window)){say('המכשיר/הדפדפן לא תומך בהתראות. באייפון: הוסף למסך הבית ופתח משם');return false}
+    if(Notification.permission!=='granted'){say('ההתראות לא אושרו במכשיר');return false}
+    if(!token){say('יש להתחבר קודם');return false}
+    const kr=await fetch('/api/subscribe',{headers:hdr()});const {key}=await kr.json();
+    if(!key){say('שגיאת שרת: חסר מפתח התראות');return false}
     const reg=await navigator.serviceWorker.ready;
     const sub=(await reg.pushManager.getSubscription())||await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64(key)});
     const r=await fetch('/api/subscribe',{method:'POST',headers:hdr(),body:JSON.stringify(sub)});
-    if(r.ok){pushOn=true;localStorage.setItem('bny-push','1')}
-  }catch(e){}
+    if(!r.ok){say('שמירת הרישום בשרת נכשלה');return false}
+    pushOn=true;localStorage.setItem('bny-push','1');updNotifBtn();say('ההתראות הופעלו במכשיר ✔');return true
+  }catch(e){say('שגיאה בהפעלת התראות: '+(e.message||e));return false}
 }
 let syncing=false;
 async function sync(){
@@ -147,7 +152,7 @@ async function sync(){
 }
 setInterval(()=>{if(!document.hidden)sync()},30000);
 addEventListener('online',sync);
-function updNotifBtn(){const b=$('#notifBtn');if(!('Notification' in window)||Notification.permission==='granted')b.hidden=true}
+function updNotifBtn(){const b=$('#notifBtn');b.hidden=!('Notification' in window)||(Notification.permission==='granted'&&localStorage.getItem('bny-push')==='1')}
 $('#notifBtn').onclick=askNotif;
 setInterval(checkReminders,30000);document.addEventListener('visibilitychange',checkReminders);
 
@@ -221,7 +226,7 @@ $('#loginFormMain').onsubmit=async e=>{e.preventDefault();const f=Object.fromEnt
 $('#mgrBtn').onclick=async()=>{if(await requestOtp())$('#loginOtp').hidden=false};
 $('#loginOtp').onsubmit=async e=>{e.preventDefault();const t=await verifyOtp(e.target.code.value);if(!t)return;
   adminTok=t.token;localStorage.setItem('bny-admin',adminTok);e.target.reset();e.target.hidden=true;renderAdmin();loggedIn(t.token,'מנהל')};
-$('#meBtn').onclick=()=>{sheet(myName||'משתמש','<button class="act" id="logoutBtn">🚪 התנתק</button>');$('#logoutBtn').onclick=()=>{$('#sheet').hidden=true;logout()}};
+$('#meBtn').onclick=()=>{sheet(myName||'משתמש','<button class="act" id="testPush">🔔 שלח לי התראת בדיקה</button><button class="act" id="logoutBtn">🚪 התנתק</button>');$('#testPush').onclick=testPush;$('#logoutBtn').onclick=()=>{$('#sheet').hidden=true;logout()}};
 function renderAll(){renderToday();renderKids();renderAdmin();renderCal();renderContacts()}
 renderAll();renderMe();updNotifBtn();checkReminders();sync();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
@@ -237,3 +242,13 @@ $('#installBtn').onclick=async()=>{
   else if(isIOS){const t=$('#iosHint');t.hidden=false;setTimeout(()=>t.hidden=true,7000)}
 };
 addEventListener('appinstalled',()=>$('#installBtn').hidden=true);
+
+async function testPush(){
+  if(!(await enablePush(true)))return;
+  try{
+    const sub=await (await navigator.serviceWorker.ready).pushManager.getSubscription();
+    const r=await fetch('/api/push-test',{method:'POST',headers:hdr(),body:JSON.stringify({endpoint:sub.endpoint})});
+    const d=await r.json().catch(()=>({}));
+    if(r.ok)toast('נשלחה התראת בדיקה – אמורה להופיע תוך שניות');else toast('השרת לא הצליח לשלוח: '+(d.error||r.status));
+  }catch(e){toast('שגיאה: '+(e.message||e))}
+}
