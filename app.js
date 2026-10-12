@@ -4,6 +4,10 @@ const KEY='bny-data-v1';
 let db={tasks:[],events:[],contacts:[],notes:[],fired:{}};
 try{db=Object.assign(db,JSON.parse(localStorage.getItem(KEY)||'{}'))}catch{}
 const CODE_KEY='bny-code';
+const KIDS=[['לינוי','#e0527a'],['רומי','#8e5bd6'],['אלין','#2f9e8f'],['גיל','#e8912d'],['אדה','#3b82c4']];
+const kidColor=n=>(KIDS.find(k=>k[0]===n)||[])[1]||'#888';
+let kidFilter='';
+let adminPw=sessionStorage.getItem('bny-admin')||'';
 let syncT;
 db.events.forEach(e=>{if(!e.at)e.at=new Date(`${e.date}T${e.time}`).getTime()});
 const save=()=>{localStorage.setItem(KEY,JSON.stringify(db));clearTimeout(syncT);syncT=setTimeout(sync,600)};
@@ -18,7 +22,17 @@ function toast(t){const e=$('#toast');e.textContent=t;e.hidden=false;setTimeout(
 
 // tabs
 $$('.tabs button').forEach(b=>b.onclick=()=>{$$('.tabs button').forEach(x=>x.classList.toggle('on',x===b));$$('.tab').forEach(t=>t.classList.toggle('active',t.id==='tab-'+b.dataset.t))});
-$('#todayLabel').textContent=new Date().toLocaleDateString('he-IL',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+function tick(){const d=new Date();
+  $('#clock').textContent=d.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+  $('#dateLine').textContent=d.toLocaleDateString('he-IL',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  $('#hebLine').textContent=d.toLocaleDateString('he-IL-u-ca-hebrew',{day:'numeric',month:'long',year:'numeric'});}
+tick();setInterval(tick,1000);
+function renderKids(){
+  $('#kids').innerHTML=KIDS.map(([n,c])=>`<button class="kid ${kidFilter===n?'on':''}" style="--c:${c}" data-k="${n}">${n}</button>`).join('');
+  const opts='<option value="">כולם</option>'+KIDS.map(k=>`<option>${k[0]}</option>`).join('');
+  $('#kidSel').innerHTML=opts;$('#whoSel').innerHTML=opts;
+}
+$('#kids').onclick=e=>{const b=e.target.closest('.kid');if(!b)return;kidFilter=kidFilter===b.dataset.k?'':b.dataset.k;renderKids();renderCal()};
 
 // sheet
 function sheet(title,html){$('#sheetTitle').textContent=title;$('#sheetBody').innerHTML=html;$('#sheet').hidden=false}
@@ -34,7 +48,7 @@ $('#taskForm').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target);db
 function renderTasks(){
   const today=iso(new Date());
   const l=live(db.tasks).filter(t=>tf==='all'||(tf==='done')===t.done);
-  $('#taskList').innerHTML=l.length?l.map(t=>`<li class="item ${t.done?'done':''} ${!t.done&&t.due&&t.due<today?'late':''}"><button class="check" data-id="${t.id}" data-a="tog">${t.done?'✓':''}</button><div class="main"><b>${esc(t.title)}</b><small>${t.who?'👤 '+esc(t.who)+' ':''}<small class="d">${t.due?'📅 '+fmtDate(t.due):''}</small></small></div><button class="del" data-id="${t.id}" data-a="del">🗑</button></li>`).join(''):'<li class="empty">אין משימות 🎉</li>';
+  $('#taskList').innerHTML=l.length?l.map(t=>`<li class="item ${t.done?'done':''} ${!t.done&&t.due&&t.due<today?'late':''}"><button class="check" data-id="${t.id}" data-a="tog">${t.done?'✓':''}</button><div class="main"><b>${esc(t.title)}</b><small>${t.who?`<span class="tag" style="--c:${kidColor(t.who)}">${esc(t.who)}</span> `:''}<small class="d">${t.due?'📅 '+fmtDate(t.due):''}</small></small></div><button class="del" data-id="${t.id}" data-a="del">🗑</button></li>`).join(''):'<li class="empty">אין משימות 🎉</li>';
 }
 $('#taskList').onclick=e=>{const b=e.target.closest('button');if(!b)return;const t=db.tasks.find(x=>x.id===b.dataset.id);if(b.dataset.a==='tog')touch(t).done=!t.done;else if(confirm('למחוק?')){t.del=1;touch(t)}save();renderTasks()};
 
@@ -44,20 +58,20 @@ function renderCal(){
   const y=view.getFullYear(),m=view.getMonth(),today=iso(new Date());
   $('#monthLabel').textContent=view.toLocaleDateString('he-IL',{month:'long',year:'numeric'});
   const start=new Date(y,m,1-new Date(y,m,1).getDay());
-  const has=new Set(live(db.events).map(e=>e.date));let h='';
+  const evs=live(db.events).filter(e=>!kidFilter||!e.kid||e.kid===kidFilter);const has=new Set(evs.map(e=>e.date));let h='';
   for(let i=0;i<42;i++){const d=new Date(start);d.setDate(start.getDate()+i);const k=iso(d);
     h+=`<button class="day ${d.getMonth()!==m?'out':''} ${k===today?'today':''} ${k===sel?'sel':''} ${has.has(k)?'has':''}" data-d="${k}">${d.getDate()}</button>`}
   $('#days').innerHTML=h;
   $('#selLabel').textContent=fmtDate(sel);
-  const ev=live(db.events).filter(e=>e.date===sel).sort((a,b)=>a.time.localeCompare(b.time));
-  $('#eventList').innerHTML=ev.length?ev.map(e=>`<li class="item"><div class="avatar">${esc(e.time)}</div><div class="main"><b>${esc(e.title)}</b><small>${e.remind>=0?'🔔 '+$('#eventForm [name=remind] option[value="'+e.remind+'"]').textContent:'ללא תזכורת'}</small></div><button class="del" data-id="${e.id}">🗑</button></li>`).join(''):'<li class="empty">אין אירועים ביום זה</li>';
+  const ev=evs.filter(e=>e.date===sel).sort((a,b)=>a.time.localeCompare(b.time));
+  $('#eventList').innerHTML=ev.length?ev.map(e=>`<li class="item"><div class="avatar">${esc(e.time)}</div><div class="main"><b>${esc(e.title)}${e.kid?`<span class="tag" style="--c:${kidColor(e.kid)}">${esc(e.kid)}</span>`:''}</b><small>${e.remind>=0?'🔔 '+$('#eventForm [name=remind] option[value="'+e.remind+'"]').textContent:'ללא תזכורת'}</small></div><button class="del" data-id="${e.id}">🗑</button></li>`).join(''):'<li class="empty">אין אירועים ביום זה</li>';
   $('#eventForm [name=date]').value=sel;
 }
 $('#days').onclick=e=>{const d=e.target.closest('.day');if(!d)return;sel=d.dataset.d;const s=new Date(sel+'T00:00');view=new Date(s.getFullYear(),s.getMonth(),1);renderCal()};
 $('#prevM').onclick=()=>{view.setMonth(view.getMonth()-1);renderCal()};
 $('#nextM').onclick=()=>{view.setMonth(view.getMonth()+1);renderCal()};
 $('#goToday').onclick=()=>{sel=iso(new Date());view=new Date();view.setDate(1);renderCal()};
-$('#eventForm').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target);const tm=f.get('time')||'00:00';db.events.push(touch({id:uid(),title:f.get('title'),date:f.get('date'),time:tm,at:new Date(`${f.get('date')}T${tm}`).getTime(),remind:+f.get('remind')}));sel=f.get('date');save();e.target.title.value='';renderCal();checkReminders();if(+f.get('remind')>=0&&Notification.permission==='default')askNotif()};
+$('#eventForm').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target);const tm=f.get('time')||'00:00';db.events.push(touch({id:uid(),title:f.get('title'),date:f.get('date'),time:tm,kid:f.get('kid')||'',at:new Date(`${f.get('date')}T${tm}`).getTime(),remind:+f.get('remind')}));sel=f.get('date');save();e.target.title.value='';e.target.closest('details').open=false;renderCal();checkReminders();if(+f.get('remind')>=0&&Notification.permission==='default')askNotif()};
 $('#eventList').onclick=e=>{const b=e.target.closest('.del');if(b&&confirm('למחוק?')){const x=db.events.find(x=>x.id===b.dataset.id);x.del=1;touch(x);save();renderCal()}};
 
 // reminders (שרת-פוש חיצוני אינו נדרש: התראות מקומיות בכל מכשיר שבו האפליקציה מותקנת)
@@ -74,14 +88,14 @@ function checkReminders(){
     if(now>=fire&&now<at+3600000&&!db.fired[e.id]){db.fired[e.id]=1;ch=true;
       notify('תזכורת: '+e.title,`${fmtDate(e.date)} בשעה ${e.time}`)}}
   const today=iso(new Date());
-  if(!db.fired['d'+today]&&new Date().getHours()>=8){const n=live(db.tasks).filter(t=>!t.done&&t.due&&t.due<=today).length;
+  if(!db.fired['d'+today]&&new Date().getHours()>=8){const n=!adminPw?0:live(db.tasks).filter(t=>!t.done&&t.due&&t.due<=today).length;
     if(n){db.fired['d'+today]=1;ch=true;notify('משימות להיום',`יש ${n} משימות פתוחות להיום או באיחור`)}}
   if(ch)save();
 }
 function askNotif(){if(!('Notification' in window))return toast('הדפדפן לא תומך בהתראות');Notification.requestPermission().then(()=>{updNotifBtn();enablePush()})}
 let pushOn=localStorage.getItem('bny-push')==='1';
 const b64=s=>{s=(s+'='.repeat((4-s.length%4)%4)).replace(/-/g,'+').replace(/_/g,'/');return Uint8Array.from(atob(s),c=>c.charCodeAt(0))};
-const hdr=()=>({'x-family-code':localStorage.getItem(CODE_KEY)||'','content-type':'application/json'});
+const hdr=()=>({'x-family-code':localStorage.getItem(CODE_KEY)||'','x-admin-code':adminPw,'content-type':'application/json'});
 async function enablePush(){
   try{
     if(!('PushManager' in window)||Notification.permission!=='granted'||!localStorage.getItem(CODE_KEY))return;
@@ -100,11 +114,11 @@ async function sync(){
   syncing=true;
   try{
     const {tasks,events,contacts,notes}=db;
-    const r=await fetch('/api/data',{method:'POST',headers:hdr(),body:JSON.stringify({tasks,events,contacts,notes})});
+    const r=await fetch('/api/data',{method:'POST',headers:hdr(),body:JSON.stringify(adminPw?{tasks,events,contacts,notes}:{events,contacts,notes})});
     if(r.status===401){localStorage.removeItem(CODE_KEY);toast('קוד שגוי');return}
     if(!r.ok)return;
     const m=await r.json();
-    if(JSON.stringify({tasks,events,contacts,notes})!==JSON.stringify(m)){Object.assign(db,m);localStorage.setItem(KEY,JSON.stringify(db));renderAll()}
+    if(JSON.stringify(adminPw?{tasks,events,contacts,notes}:{events,contacts,notes})!==JSON.stringify(m)){Object.assign(db,m);localStorage.setItem(KEY,JSON.stringify(db));renderAll()}
     enablePush();
   }catch(e){}finally{syncing=false}
 }
@@ -144,6 +158,13 @@ function renderNotes(){
 }
 $('#noteList').onclick=e=>{const w=e.target.closest('[data-w]');if(w)return open(waze(w.dataset.w),'_blank');const b=e.target.closest('.del');if(b&&confirm('למחוק?')){const n=db.notes.find(n=>n.id===b.dataset.id);n.del=1;touch(n);save();renderNotes()}};
 
-function renderAll(){renderTasks();renderCal();renderContacts();renderNotes()}
+function renderAdmin(){const on=!!adminPw;$('#loginForm').hidden=on;$('#adminBody').hidden=!on;if(on)renderTasks()}
+$('#loginForm').onsubmit=async e=>{e.preventDefault();const pw=e.target.pw.value;
+  if(!localStorage.getItem(CODE_KEY))await sync();
+  try{const r=await fetch('/api/auth',{headers:{...hdr(),'x-admin-code':pw}});
+    if(!r.ok)return toast('סיסמה שגויה');
+    adminPw=pw;sessionStorage.setItem('bny-admin',pw);e.target.reset();renderAdmin();sync()}catch{toast('אין חיבור לשרת')}};
+$('#lockBtn').onclick=()=>{adminPw='';sessionStorage.removeItem('bny-admin');renderAdmin()};
+function renderAll(){renderKids();renderAdmin();renderCal();renderContacts();renderNotes()}
 renderAll();updNotifBtn();checkReminders();sync();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});

@@ -1,14 +1,17 @@
-const { getJSON, setJSON, merge, auth } = require('./_lib');
+const { getJSON, setJSON, merge, auth, isAdmin } = require('./_lib');
 module.exports = async (req, res) => {
   if (!auth(req, res)) return;
   try {
+    const admin = isAdmin(req);
     const cur = (await getJSON('bny:data')) || {};
+    let out = merge(cur, {});
     if (req.method === 'POST') {
       const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
-      const merged = merge(cur, body);
-      await setJSON('bny:data', merged);
-      return res.status(200).json(merged);
+      if (!admin) delete body.tasks; // משימות נכתבות רק ממצב ניהול
+      out = merge(cur, body);
+      await setJSON('bny:data', out);
     }
-    res.status(200).json(merge(cur, {}));
+    if (!admin) delete out.tasks; // משימות נקראות רק ממצב ניהול
+    res.status(200).json(out);
   } catch (e) { res.status(500).json({ error: String(e.message || e) }); }
 };

@@ -14,30 +14,19 @@
 <header class="top">
   <div class="brand">
     <img src="icon.svg" alt="" width="40" height="40">
-    <div><h1>משפחת בן יהודה</h1><p id="todayLabel"></p></div>
+    <h1>משפחת בן יהודה</h1>
   </div>
-  <button id="notifBtn" class="chip" title="הפעלת תזכורות">🔔 הפעל תזכורות</button>
+  <button id="notifBtn" class="chip" title="הפעלת תזכורות">🔔 תזכורות</button>
 </header>
 
 <main>
-  <!-- משימות -->
-  <section id="tab-tasks" class="tab active">
-    <form id="taskForm" class="card form">
-      <input name="title" placeholder="משימה חדשה…" required>
-      <div class="row">
-        <input name="who" placeholder="למי? (אבא, אמא, …)">
-        <input name="due" type="date">
-      </div>
-      <button class="btn">＋ הוסף משימה</button>
-    </form>
-    <div class="filters" id="taskFilters">
-      <button data-f="open" class="on">פתוחות</button><button data-f="done">הושלמו</button><button data-f="all">הכל</button>
+  <!-- דשבורד -->
+  <section id="tab-home" class="tab active">
+    <div class="card clockCard">
+      <div id="clock" class="clock">--:--</div>
+      <div id="dateLine" class="dateLine"></div>
+      <div id="hebLine" class="hebLine"></div>
     </div>
-    <ul id="taskList" class="list"></ul>
-  </section>
-
-  <!-- לוח שנה -->
-  <section id="tab-cal" class="tab">
     <div class="card">
       <div class="calHead">
         <button id="nextM" class="icon" aria-label="חודש הבא">‹</button>
@@ -50,21 +39,27 @@
     </div>
     <h3 id="selLabel" class="sec"></h3>
     <ul id="eventList" class="list"></ul>
-    <form id="eventForm" class="card form">
-      <input name="title" placeholder="אירוע חדש (למשל: ארוחת שישי)" required>
-      <div class="row">
-        <input name="date" type="date" required>
-        <input name="time" type="time" value="18:00">
-      </div>
-      <label class="lbl">תזכורת
-        <select name="remind">
-          <option value="-1">ללא</option><option value="0">בזמן האירוע</option>
-          <option value="15">15 דקות לפני</option><option value="60" selected>שעה לפני</option>
-          <option value="180">3 שעות לפני</option><option value="1440">יום לפני</option>
-        </select>
-      </label>
-      <button class="btn">＋ הוסף ללוח</button>
-    </form>
+    <details class="card">
+      <summary class="btn gold">＋ אירוע חדש</summary>
+      <form id="eventForm" class="form" style="margin-top:12px">
+        <input name="title" placeholder="אירוע חדש (למשל: חוג ריקוד)" required>
+        <div class="row">
+          <input name="date" type="date" required>
+          <input name="time" type="time" value="18:00">
+        </div>
+        <label class="lbl">עבור
+          <select name="kid" id="kidSel"></select>
+        </label>
+        <label class="lbl">תזכורת
+          <select name="remind">
+            <option value="-1">ללא</option><option value="0">בזמן האירוע</option>
+            <option value="15">15 דקות לפני</option><option value="60" selected>שעה לפני</option>
+            <option value="180">3 שעות לפני</option><option value="1440">יום לפני</option>
+          </select>
+        </label>
+        <button class="btn">＋ הוסף ללוח</button>
+      </form>
+    </details>
   </section>
 
   <!-- אנשי קשר -->
@@ -91,13 +86,40 @@
     </form>
     <ul id="noteList" class="list"></ul>
   </section>
+
+  <!-- ניהול (מוגן בסיסמה) -->
+  <section id="tab-admin" class="tab">
+    <form id="loginForm" class="card form">
+      <h3>🔐 ניהול משימות</h3>
+      <p class="mut">הכנס סיסמת ניהול כדי לראות ולערוך משימות.</p>
+      <input name="pw" type="password" placeholder="סיסמה" autocomplete="current-password" required>
+      <button class="btn">כניסה</button>
+    </form>
+    <div id="adminBody" hidden>
+      <div class="adminBar"><h3>ניהול משימות</h3><button id="lockBtn" class="chip dark">🔒 נעל</button></div>
+      <form id="taskForm" class="card form">
+        <input name="title" placeholder="משימה חדשה…" required>
+        <div class="row">
+          <select name="who" id="whoSel"></select>
+          <input name="due" type="date">
+        </div>
+        <button class="btn">＋ הוסף משימה</button>
+      </form>
+      <div class="filters" id="taskFilters">
+        <button data-f="open" class="on">פתוחות</button><button data-f="done">הושלמו</button><button data-f="all">הכל</button>
+      </div>
+      <ul id="taskList" class="list"></ul>
+    </div>
+  </section>
 </main>
 
+<div class="kids" id="kids"></div>
+
 <nav class="tabs">
-  <button data-t="tasks" class="on"><span>✅</span>משימות</button>
-  <button data-t="cal"><span>📅</span>לוח שנה</button>
+  <button data-t="home" class="on"><span>🏠</span>בית</button>
   <button data-t="contacts"><span>👥</span>אנשי קשר</button>
   <button data-t="notes"><span>📝</span>הערות</button>
+  <button data-t="admin"><span>🔐</span>ניהול</button>
 </nav>
 
 <div id="sheet" class="sheet" hidden>

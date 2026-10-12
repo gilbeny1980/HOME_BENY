@@ -20,4 +20,8 @@ function auth(req, res) {
   if (!code || req.headers['x-family-code'] !== code) { res.status(401).json({ error: 'bad code' }); return false; }
   return true;
 }
-module.exports = { redis, getJSON, setJSON, merge, auth };
+function isAdmin(req) {
+  const code = process.env.ADMIN_CODE || process.env.FAMILY_CODE;
+  return !!code && req.headers['x-admin-code'] === code;
+}
+module.exports = { isAdmin, redis, getJSON, setJSON, merge, auth };
