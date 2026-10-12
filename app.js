@@ -7,7 +7,7 @@ const CODE_KEY='bny-code';
 const KIDS=[['לינוי','#e0527a'],['רומי','#8e5bd6'],['אלין','#2f9e8f'],['גיל','#e8912d'],['אדה','#3b82c4']];
 const kidColor=n=>(KIDS.find(k=>k[0]===n)||[])[1]||'#888';
 let kidFilter='';
-let adminPw=sessionStorage.getItem('bny-admin')||'';
+let adminPw=localStorage.getItem('bny-admin')||'';
 let syncT;
 db.events.forEach(e=>{if(!e.at)e.at=new Date(`${e.date}T${e.time}`).getTime()});
 const save=()=>{localStorage.setItem(KEY,JSON.stringify(db));clearTimeout(syncT);syncT=setTimeout(sync,600)};
@@ -30,6 +30,7 @@ tick();setInterval(tick,1000);
 function renderKids(){
   $('#kids').innerHTML=KIDS.map(([n,c])=>`<button class="kid ${kidFilter===n?'on':''}" style="--c:${c}" data-k="${n}">${n}</button>`).join('');
   const opts='<option value="">כולם</option>'+KIDS.map(k=>`<option>${k[0]}</option>`).join('');
+  $('#kidChecks').innerHTML=KIDS.map(([n,c])=>`<label class="ck" style="--c:${c}"><input type="checkbox" name="kids" value="${n}"><span>${n}</span></label>`).join('');
   $('#kidSel').innerHTML=opts;$('#whoSel').innerHTML=opts;
 }
 $('#kids').onclick=e=>{const b=e.target.closest('.kid');if(!b)return;kidFilter=kidFilter===b.dataset.k?'':b.dataset.k;renderKids();renderCal()};
@@ -64,7 +65,7 @@ function renderCal(){
   $('#days').innerHTML=h;
   $('#selLabel').textContent=fmtDate(sel);
   const ev=evs.filter(e=>e.date===sel).sort((a,b)=>a.time.localeCompare(b.time));
-  $('#eventList').innerHTML=ev.length?ev.map(e=>`<li class="item"><div class="avatar">${esc(e.time)}</div><div class="main"><b>${esc(e.title)}${e.kid?`<span class="tag" style="--c:${kidColor(e.kid)}">${esc(e.kid)}</span>`:''}</b><small>${e.remind>=0?'🔔 '+$('#eventForm [name=remind] option[value="'+e.remind+'"]').textContent:'ללא תזכורת'}</small></div><button class="del" data-id="${e.id}">🗑</button></li>`).join(''):'<li class="empty">אין אירועים ביום זה</li>';
+  $('#eventList').innerHTML=ev.length?ev.map(e=>`<li class="item"><div class="avatar">${esc(e.time)}</div><div class="main"><b>${esc(e.title)}${e.kid?`<span class="tag" style="--c:${kidColor(e.kid)}">${esc(e.kid)}</span>`:''}</b><small>${e.remind>=0?'🔔 '+$('#eventForm [name=remind] option[value="'+e.remind+'"]').textContent:'ללא תזכורת'}</small></div><button class="share" data-s="${e.id}" title="שלח תזכורת">📤</button><button class="del" data-id="${e.id}">🗑</button></li>`).join(''):'<li class="empty">אין אירועים ביום זה</li>';
   $('#eventForm [name=date]').value=sel;
 }
 $('#days').onclick=e=>{const d=e.target.closest('.day');if(!d)return;sel=d.dataset.d;const s=new Date(sel+'T00:00');view=new Date(s.getFullYear(),s.getMonth(),1);renderCal()};
@@ -72,7 +73,15 @@ $('#prevM').onclick=()=>{view.setMonth(view.getMonth()-1);renderCal()};
 $('#nextM').onclick=()=>{view.setMonth(view.getMonth()+1);renderCal()};
 $('#goToday').onclick=()=>{sel=iso(new Date());view=new Date();view.setDate(1);renderCal()};
 $('#eventForm').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target);const tm=f.get('time')||'00:00';db.events.push(touch({id:uid(),title:f.get('title'),date:f.get('date'),time:tm,kid:f.get('kid')||'',at:new Date(`${f.get('date')}T${tm}`).getTime(),remind:+f.get('remind')}));sel=f.get('date');save();e.target.title.value='';e.target.closest('details').open=false;renderCal();checkReminders();if(+f.get('remind')>=0&&Notification.permission==='default')askNotif()};
-$('#eventList').onclick=e=>{const b=e.target.closest('.del');if(b&&confirm('למחוק?')){const x=db.events.find(x=>x.id===b.dataset.id);x.del=1;touch(x);save();renderCal()}};
+function shareEvent(ev){
+  const txt=`תזכורת: ${ev.title}${ev.kid?' ('+ev.kid+')':''} – ${fmtDate(ev.date)} בשעה ${ev.time}`;
+  const cs=live(db.contacts).filter(c=>(c.phone||c.email)&&(!ev.kid||!(c.kids||[]).length||c.kids.includes(ev.kid)));
+  let h=`<p class="mut">${esc(txt)}</p>`;
+  h+=cs.map(c=>`<div class="act"><b style="flex:1">${esc(c.name)}</b>${c.phone?`<a href="https://wa.me/${intl(c.phone)}?text=${encodeURIComponent(txt)}" target="_blank">🟢</a><a href="sms:${esc(c.phone)}?&body=${encodeURIComponent(txt)}">💬</a>`:''}${c.email?`<a href="mailto:${esc(c.email)}?subject=${encodeURIComponent('תזכורת: '+ev.title)}&body=${encodeURIComponent(txt)}">✉️</a>`:''}</div>`).join('')||'<p class="empty">אין אנשי קשר מתאימים</p>';
+  h+=`<a class="act" href="https://wa.me/?text=${encodeURIComponent(txt)}" target="_blank">🟢 וואטסאפ – בחירת נמען / קבוצה</a>`;
+  sheet('שליחת תזכורת',h);
+}
+$('#eventList').onclick=e=>{const s=e.target.closest('.share');if(s)return shareEvent(db.events.find(x=>x.id===s.dataset.s));const b=e.target.closest('.del');if(b&&confirm('למחוק?')){const x=db.events.find(x=>x.id===b.dataset.id);x.del=1;touch(x);save();renderCal()}};
 
 // reminders (שרת-פוש חיצוני אינו נדרש: התראות מקומיות בכל מכשיר שבו האפליקציה מותקנת)
 async function notify(title,body){
@@ -131,13 +140,13 @@ setInterval(checkReminders,30000);document.addEventListener('visibilitychange',c
 // contacts
 function renderContacts(){
   const q=$('#search').value.trim().toLowerCase();
-  const l=live(db.contacts).filter(c=>!q||(c.name+c.phone+c.address).toLowerCase().includes(q)).sort((a,b)=>a.name.localeCompare(b.name,'he'));
-  $('#contactList').innerHTML=l.length?l.map(c=>`<li class="item" data-id="${c.id}"><div class="avatar">${esc(c.name[0])}</div><div class="main"><b>${esc(c.name)}</b><small>${esc(c.phone)} ${c.note?'· '+esc(c.note):''}</small>${c.address?`<br><button class="addr" data-w="${c.id}">📍 ${esc(c.address)}</button>`:''}</div><button class="del" data-x="${c.id}">🗑</button></li>`).join(''):'<li class="empty">אין אנשי קשר</li>';
+  const l=live(db.contacts).filter(c=>(!kidFilter||(c.kids||[]).includes(kidFilter))&&(!q||(c.name+c.phone+c.address+(c.email||'')).toLowerCase().includes(q))).sort((a,b)=>a.name.localeCompare(b.name,'he'));
+  $('#contactList').innerHTML=l.length?l.map(c=>`<li class="item" data-id="${c.id}"><div class="avatar">${esc(c.name[0])}</div><div class="main"><b>${esc(c.name)}</b><small>${esc(c.phone)} ${c.note?'· '+esc(c.note):''}</small><div>${(c.kids||[]).map(k=>`<span class="tag" style="--c:${kidColor(k)}">${esc(k)}</span>`).join('')}</div>${c.address?`<br><button class="addr" data-w="${c.id}">📍 ${esc(c.address)}</button>`:''}</div><button class="del" data-x="${c.id}">🗑</button></li>`).join(''):'<li class="empty">אין אנשי קשר</li>';
   const sel=$('#noteContact');const v=sel.value;
   sel.innerHTML='<option value="">ללא איש קשר</option>'+live(db.contacts).map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');sel.value=v;
 }
 $('#search').oninput=renderContacts;
-$('#contactForm').onsubmit=e=>{e.preventDefault();const f=Object.fromEntries(new FormData(e.target));db.contacts.push(touch({id:uid(),...f}));save();e.target.reset();renderContacts()};
+$('#contactForm').onsubmit=e=>{e.preventDefault();const fd=new FormData(e.target);const f=Object.fromEntries(fd);delete f.kids;db.contacts.push(touch({id:uid(),...f,kids:fd.getAll('kids')}));save();e.target.reset();renderContacts()};
 $('#contactList').onclick=e=>{
   const x=e.target.closest('[data-x]');if(x){if(confirm('למחוק?')){const c=db.contacts.find(c=>c.id===x.dataset.x);c.del=1;touch(c);save();renderContacts()}return}
   const w=e.target.closest('[data-w]');if(w){const c=db.contacts.find(c=>c.id===w.dataset.w);open(waze(c.address),'_blank');return}
@@ -145,6 +154,7 @@ $('#contactList').onclick=e=>{
   const notes=live(db.notes).filter(n=>n.contact===c.id);
   let h='';
   if(c.phone)h+=`<a class="act" href="tel:${esc(c.phone)}">📞 התקשר ${esc(c.phone)}</a><a class="act" href="sms:${esc(c.phone)}">💬 שלח SMS</a><a class="act" href="https://wa.me/${intl(c.phone)}" target="_blank">🟢 וואטסאפ</a>`;
+  if(c.email)h+=`<a class="act" href="mailto:${esc(c.email)}">✉️ שלח מייל ${esc(c.email)}</a>`;
   if(c.address)h+=`<a class="act" href="${waze(c.address)}" target="_blank">🚗 נווט ב-Waze: ${esc(c.address)}</a>`;
   if(notes.length)h+=notes.map(n=>`<div class="act">📝 <span><b>${esc(n.title)}</b><br>${esc(n.text)}</span></div>`).join('');
   sheet(c.name,h||'<p class="empty">אין פרטים</p>');
@@ -163,8 +173,8 @@ $('#loginForm').onsubmit=async e=>{e.preventDefault();const pw=e.target.pw.value
   if(!localStorage.getItem(CODE_KEY))await sync();
   try{const r=await fetch('/api/auth',{headers:{...hdr(),'x-admin-code':pw}});
     if(!r.ok)return toast('סיסמה שגויה');
-    adminPw=pw;sessionStorage.setItem('bny-admin',pw);e.target.reset();renderAdmin();sync()}catch{toast('אין חיבור לשרת')}};
-$('#lockBtn').onclick=()=>{adminPw='';sessionStorage.removeItem('bny-admin');renderAdmin()};
+    adminPw=pw;localStorage.setItem('bny-admin',pw);e.target.reset();renderAdmin();sync()}catch{toast('אין חיבור לשרת')}};
+$('#lockBtn').onclick=()=>{adminPw='';localStorage.removeItem('bny-admin');renderAdmin()};
 function renderAll(){renderKids();renderAdmin();renderCal();renderContacts();renderNotes()}
 renderAll();updNotifBtn();checkReminders();sync();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
