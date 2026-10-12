@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1e3a5f">
+<title>ניהול משימות משפחת בן יהודה</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <img src="icon.svg" alt="" width="40" height="40">
+    <div><h1>משפחת בן יהודה</h1><p id="todayLabel"></p></div>
+  </div>
+  <button id="notifBtn" class="chip" title="הפעלת תזכורות">🔔 הפעל תזכורות</button>
+</header>
+
+<main>
+  <!-- משימות -->
+  <section id="tab-tasks" class="tab active">
+    <form id="taskForm" class="card form">
+      <input name="title" placeholder="משימה חדשה…" required>
+      <div class="row">
+        <input name="who" placeholder="למי? (אבא, אמא, …)">
+        <input name="due" type="date">
+      </div>
+      <button class="btn">＋ הוסף משימה</button>
+    </form>
+    <div class="filters" id="taskFilters">
+      <button data-f="open" class="on">פתוחות</button><button data-f="done">הושלמו</button><button data-f="all">הכל</button>
+    </div>
+    <ul id="taskList" class="list"></ul>
+  </section>
+
+  <!-- לוח שנה -->
+  <section id="tab-cal" class="tab">
+    <div class="card">
+      <div class="calHead">
+        <button id="nextM" class="icon" aria-label="חודש הבא">‹</button>
+        <h2 id="monthLabel"></h2>
+        <button id="prevM" class="icon" aria-label="חודש קודם">›</button>
+      </div>
+      <div class="grid dow"><span>א</span><span>ב</span><span>ג</span><span>ד</span><span>ה</span><span>ו</span><span>ש</span></div>
+      <div class="grid days" id="days"></div>
+      <button id="goToday" class="chip">היום</button>
+    </div>
+    <h3 id="selLabel" class="sec"></h3>
+    <ul id="eventList" class="list"></ul>
+    <form id="eventForm" class="card form">
+      <input name="title" placeholder="אירוע חדש (למשל: ארוחת שישי)" required>
+      <div class="row">
+        <input name="date" type="date" required>
+        <input name="time" type="time" value="18:00">
+      </div>
+      <label class="lbl">תזכורת
+        <select name="remind">
+          <option value="-1">ללא</option><option value="0">בזמן האירוע</option>
+          <option value="15">15 דקות לפני</option><option value="60" selected>שעה לפני</option>
+          <option value="180">3 שעות לפני</option><option value="1440">יום לפני</option>
+        </select>
+      </label>
+      <button class="btn">＋ הוסף ללוח</button>
+    </form>
+  </section>
+
+  <!-- אנשי קשר -->
+  <section id="tab-contacts" class="tab">
+    <input id="search" class="search" placeholder="🔍 חיפוש איש קשר…">
+    <ul id="contactList" class="list"></ul>
+    <form id="contactForm" class="card form">
+      <h3>איש קשר חדש</h3>
+      <input name="name" placeholder="שם" required>
+      <input name="phone" type="tel" placeholder="טלפון" dir="ltr">
+      <input name="address" placeholder="כתובת (עיר, רחוב ומספר)">
+      <input name="note" placeholder="הערה קצרה (קשר משפחתי…)">
+      <button class="btn">＋ שמור</button>
+    </form>
+  </section>
+
+  <!-- הערות -->
+  <section id="tab-notes" class="tab">
+    <form id="noteForm" class="card form">
+      <input name="title" placeholder="כותרת (למשל: חניה אצל סבתא)" required>
+      <textarea name="text" rows="4" placeholder="הסבר על המיקום, קוד כניסה, קומה, דירה…"></textarea>
+      <select name="contact" id="noteContact"></select>
+      <button class="btn">＋ שמור הערה</button>
+    </form>
+    <ul id="noteList" class="list"></ul>
+  </section>
+</main>
+
+<nav class="tabs">
+  <button data-t="tasks" class="on"><span>✅</span>משימות</button>
+  <button data-t="cal"><span>📅</span>לוח שנה</button>
+  <button data-t="contacts"><span>👥</span>אנשי קשר</button>
+  <button data-t="notes"><span>📝</span>הערות</button>
+</nav>
+
+<div id="sheet" class="sheet" hidden>
+  <div class="sheetBox"><h3 id="sheetTitle"></h3><div id="sheetBody"></div><button class="btn ghost" id="sheetClose">סגור</button></div>
+</div>
+<div id="toast" class="toast" hidden></div>
+<script src="app.js"></script>
+</body>
+</html>
