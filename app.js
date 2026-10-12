@@ -98,10 +98,11 @@ function shareEvent(ev){
 $('#eventList').onclick=e=>{const s=e.target.closest('.share');if(s)return shareEvent(db.events.find(x=>x.id===s.dataset.s));const b=e.target.closest('.del');if(b&&confirm('למחוק?')){const x=db.events.find(x=>x.id===b.dataset.id);x.del=1;touch(x);save();renderCal()}};
 
 // reminders (שרת-פוש חיצוני אינו נדרש: התראות מקומיות בכל מכשיר שבו האפליקציה מותקנת)
+function beep(){try{const c=new (window.AudioContext||window.webkitAudioContext)();[880,1175,1568].forEach((f,i)=>{const o=c.createOscillator(),g=c.createGain();o.frequency.value=f;o.type='sine';o.connect(g);g.connect(c.destination);const t=c.currentTime+i*.18;g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.35,t+.02);g.gain.exponentialRampToValueAtTime(.0001,t+.17);o.start(t);o.stop(t+.18)})}catch{}}
 async function notify(title,body){
   toast('🔔 '+title);
   if(!('Notification' in window)||Notification.permission!=='granted')return;
-  try{const r=await navigator.serviceWorker.ready;await r.showNotification(title,{body,icon:'icon.svg',dir:'rtl',lang:'he',tag:title+body,vibrate:[200,100,200]})}catch{new Notification(title,{body})}
+  beep();try{const r=await navigator.serviceWorker.ready;await r.showNotification(title,{body,icon:'icons/icon-192.png',dir:'rtl',lang:'he',tag:title+body,renotify:true,silent:false,requireInteraction:true,vibrate:[300,150,300,150,300]})}catch{new Notification(title,{body})}
 }
 function checkReminders(){
   const now=Date.now();let ch=false;
