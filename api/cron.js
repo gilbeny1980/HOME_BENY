@@ -4,7 +4,8 @@ const { markFired, subsAll, subDel, getJSON } = require('./_lib');
 // and each reminder is sent once (markFired), so calling it extra times is harmless.
 module.exports = async (req, res) => {
   try {
-    webpush.setVapidDetails(process.env.VAPID_SUBJECT || 'mailto:admin@example.com', process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
+    const clean = v => String(v || '').replace(/[^A-Za-z0-9_-]/g, ''); // tolerate stray spaces/quotes/dots from copy-paste
+    webpush.setVapidDetails((process.env.VAPID_SUBJECT || 'mailto:admin@example.com').trim(), clean(process.env.VAPID_PUBLIC_KEY), clean(process.env.VAPID_PRIVATE_KEY));
     const db = (await getJSON('bny:data')) || {};
     const now = Date.now(), msgs = [];
     for (const e of (db.events || [])) {
