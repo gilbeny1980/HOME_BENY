@@ -6,6 +6,8 @@ module.exports = (req, res) => {
     FAMILY_CODE: has('FAMILY_CODE'), ADMIN_EMAIL: has('ADMIN_EMAIL'), RESEND_API_KEY: has('RESEND_API_KEY'),
     VAPID_PUBLIC_KEY: has('VAPID_PUBLIC_KEY'), VAPID_PRIVATE_KEY: has('VAPID_PRIVATE_KEY'), VAPID_SUBJECT: has('VAPID_SUBJECT'),
     CRON_SECRET: has('CRON_SECRET'), CRON_SECRET_length: (e.CRON_SECRET || '').length,
+    VAPID_PUBLIC_KEY_length: (e.VAPID_PUBLIC_KEY || '').length, VAPID_PRIVATE_KEY_length: (e.VAPID_PRIVATE_KEY || '').length,
+    VAPID_PRIVATE_KEY_valid_chars: /^[A-Za-z0-9_-]*$/.test(e.VAPID_PRIVATE_KEY || ''), VAPID_PUBLIC_KEY_valid_chars: /^[A-Za-z0-9_-]*$/.test(e.VAPID_PUBLIC_KEY || ''),
     env: e.VERCEL_ENV || null,
   });
 };
