@@ -1,9 +1,8 @@
 const webpush = require('web-push');
 const { markFired, subsAll, subDel, getJSON } = require('./_lib');
-// Called every 5 minutes (GitHub Actions) with Authorization: Bearer CRON_SECRET
+// Called every 5 minutes by GitHub Actions. Public on purpose: it only sends reminders that are already due,
+// and each reminder is sent once (markFired), so calling it extra times is harmless.
 module.exports = async (req, res) => {
-  const secret = process.env.CRON_SECRET;
-  if (!secret || req.headers.authorization !== `Bearer ${secret}`) return res.status(401).json({ error: 'unauthorized' });
   try {
     webpush.setVapidDetails(process.env.VAPID_SUBJECT || 'mailto:admin@example.com', process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
     const db = (await getJSON('bny:data')) || {};

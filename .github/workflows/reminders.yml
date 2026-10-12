@@ -9,7 +9,6 @@ jobs:
     steps:
       - name: Check reminders
         env:
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
           SITE_URL: ${{ secrets.SITE_URL }}
         run: |
-          curl -fsS -H "Authorization: Bearer $CRON_SECRET" "$SITE_URL/api/cron"
+          curl -fsS "$SITE_URL/api/cron"
