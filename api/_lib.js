@@ -1,13 +1,25 @@
-const URL_ = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-const TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
-async function redis(...cmd) {
-  const r = await fetch(URL_, { method: 'POST', headers: { Authorization: `Bearer ${TOKEN}` }, body: JSON.stringify(cmd) });
-  const j = await r.json();
-  if (j.error) throw new Error(j.error);
-  return j.result;
+const { createClient } = require('@libsql/client');
+let db, ready;
+function client() {
+  if (!db) db = createClient({ url: process.env.TURSO_DATABASE_URL, authToken: process.env.TURSO_AUTH_TOKEN });
+  return db;
 }
-const getJSON = async k => { const v = await redis('GET', k); return v ? JSON.parse(v) : null; };
-const setJSON = (k, v) => redis('SET', k, JSON.stringify(v));
+function init() {
+  if (!ready) ready = client().batch([
+    'CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT)',
+    'CREATE TABLE IF NOT EXISTS subs (endpoint TEXT PRIMARY KEY, data TEXT)',
+    'CREATE TABLE IF NOT EXISTS fired (k TEXT PRIMARY KEY)',
+  ]).catch(e => { ready = null; throw e; });
+  return ready;
+}
+async function exec(sql, args = []) { await init(); return client().execute({ sql, args }); }
+const getJSON = async k => { const r = await exec('SELECT v FROM kv WHERE k = ?', [k]); return r.rows[0] ? JSON.parse(r.rows[0].v) : null; };
+const setJSON = (k, v) => exec('INSERT INTO kv (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v', [k, JSON.stringify(v)]);
+const subPut = sub => exec('INSERT INTO subs (endpoint, data) VALUES (?, ?) ON CONFLICT(endpoint) DO UPDATE SET data = excluded.data', [sub.endpoint, JSON.stringify(sub)]);
+const subsAll = async () => (await exec('SELECT data FROM subs')).rows.map(r => JSON.parse(r.data));
+const subDel = endpoint => exec('DELETE FROM subs WHERE endpoint = ?', [endpoint]);
+// true only the first time a key is marked (prevents duplicate reminders)
+const markFired = async k => (await exec('INSERT OR IGNORE INTO fired (k) VALUES (?)', [k])).rowsAffected > 0;
 const COLS = ['tasks', 'events', 'contacts', 'notes'];
 function mergeList(a = [], b = []) {
   const m = new Map();
@@ -24,4 +36,4 @@ function isAdmin(req) {
   const code = process.env.ADMIN_CODE || process.env.FAMILY_CODE;
   return !!code && req.headers['x-admin-code'] === code;
 }
-module.exports = { isAdmin, redis, getJSON, setJSON, merge, auth };
+module.exports = { isAdmin, subPut, subsAll, subDel, markFired, getJSON, setJSON, merge, auth };

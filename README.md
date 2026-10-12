@@ -1,10 +1,10 @@
 # ניהול משימות משפחת בן יהודה
 PWA בעברית (RTL): משימות, לוח שנה עם תזכורות, אנשי קשר (התקשרות / SMS / וואטסאפ / Waze) והערות.
-הנתונים משותפים בין כל המכשירים (Upstash Redis) ותזכורות Push מגיעות גם כשהאפליקציה סגורה.
+הנתונים משותפים בין כל המכשירים (Turso) ותזכורות Push מגיעות גם כשהאפליקציה סגורה.
 
 ## הקמה (חד־פעמית)
 1. **Vercel**: Add New → Project → ייבוא הריפו (Framework: Other, ללא build).
-2. **מסד נתונים**: ב-Vercel → Storage → Marketplace → Upstash Redis → חיבור לפרויקט (מגדיר `KV_REST_API_URL` ו-`KV_REST_API_TOKEN`).
+2. **מסד נתונים**: ב-turso.tech יוצרים מסד, ואז מוסיפים ב-Vercel את `TURSO_DATABASE_URL` (מתחיל ב-`libsql://`) ואת `TURSO_AUTH_TOKEN`. הטבלאות נוצרות אוטומטית.
 3. **מפתחות Push**: `npx web-push generate-vapid-keys`
 4. **Environment Variables ב-Vercel** (ואז Redeploy):
    - `FAMILY_CODE` – קוד משפחתי סודי (כל בני המשפחה מזינים אותו באפליקציה בפעם הראשונה)
