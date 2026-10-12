@@ -75,21 +75,9 @@
 
   <!-- אנשי קשר -->
   <section id="tab-contacts" class="tab">
+    <button id="addContactBtn" class="btn gold" type="button" style="width:100%;margin-bottom:12px">＋ איש קשר חדש</button>
     <input id="search" class="search" placeholder="🔍 חיפוש איש קשר…">
     <ul id="contactList" class="list"></ul>
-    <form id="contactForm" class="card form">
-      <h3>איש קשר חדש</h3>
-      <input name="name" placeholder="שם" required>
-      <input name="phone" type="tel" placeholder="טלפון" dir="ltr">
-      <input name="email" type="email" placeholder="אימייל" dir="ltr">
-      <input name="address" placeholder="כתובת (עיר, רחוב ומספר)">
-      <input name="note" placeholder="קשר משפחתי (סבתא, גננת…)">
-      <textarea name="info" rows="4" placeholder="📝 הערות: הסבר על המיקום, קוד כניסה, קומה, דירה…"></textarea>
-      <div class="lbl">שייך לילדות (אפשר כמה)</div>
-      <div id="kidChecks" class="checks"></div>
-      <button class="btn" id="contactSave">＋ שמור</button>
-      <button type="button" class="btn ghost" id="contactCancel" hidden>ביטול עריכה</button>
-    </form>
   </section>
 
   <!-- ניהול (מוגן בסיסמה) -->
@@ -159,6 +147,23 @@
       <p class="mut">שלחנו קוד בן 6 ספרות למייל של המנהל.</p>
       <input name="code" inputmode="numeric" maxlength="6" placeholder="______" dir="ltr" required autocomplete="one-time-code">
       <button class="btn">אישור</button>
+    </form>
+  </div>
+</div>
+<div id="contactModal" class="sheet" hidden>
+  <div class="sheetBox">
+    <form id="contactForm" class="form">
+      <h3>איש קשר חדש</h3>
+      <input name="name" placeholder="שם" required>
+      <input name="phone" type="tel" placeholder="טלפון" dir="ltr">
+      <input name="email" type="email" placeholder="אימייל" dir="ltr">
+      <input name="address" placeholder="כתובת (עיר, רחוב ומספר)">
+      <input name="note" placeholder="קשר משפחתי (סבתא, גננת…)">
+      <textarea name="info" rows="4" placeholder="📝 הערות: הסבר על המיקום, קוד כניסה, קומה, דירה…"></textarea>
+      <div class="lbl">שייך לילדות (אפשר כמה)</div>
+      <div id="kidChecks" class="checks"></div>
+      <button class="btn" id="contactSave">＋ שמור</button>
+      <button type="button" class="btn ghost" id="contactCancel">ביטול</button>
     </form>
   </div>
 </div>

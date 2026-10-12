@@ -159,12 +159,14 @@ function renderContacts(){
 }
 $('#search').oninput=renderContacts;
 let editId='';
-function endEdit(){editId='';$('#contactForm').reset();$('#contactForm h3').textContent='איש קשר חדש';$('#contactSave').textContent='＋ שמור';$('#contactCancel').hidden=true}
+function endEdit(){editId='';$('#contactForm').reset();$('#contactForm h3').textContent='איש קשר חדש';$('#contactSave').textContent='＋ שמור';$('#contactModal').hidden=true}
+function openContactForm(){$('#contactModal').hidden=false}
+$('#addContactBtn').onclick=()=>{editId='';$('#contactForm').reset();$('#contactForm h3').textContent='איש קשר חדש';$('#contactSave').textContent='＋ שמור';openContactForm();setTimeout(()=>$('#contactForm [name=name]').focus(),50)};
+$('#contactModal').onclick=e=>{if(e.target.id==='contactModal')endEdit()};
 function editContact(c){editId=c.id;const f=$('#contactForm');
   for(const k of ['name','phone','email','address','note','info'])f.elements[k].value=c[k]||'';
   $$('#kidChecks input').forEach(i=>i.checked=(c.kids||[]).includes(i.value));
-  f.querySelector('h3').textContent='עריכת איש קשר';$('#contactSave').textContent='שמור שינויים';$('#contactCancel').hidden=false;
-  f.scrollIntoView({behavior:'smooth',block:'center'})}
+  f.querySelector('h3').textContent='עריכת איש קשר';$('#contactSave').textContent='שמור שינויים';openContactForm();}
 $('#contactCancel').onclick=endEdit;
 $('#contactForm').onsubmit=e=>{e.preventDefault();const fd=new FormData(e.target);const f=Object.fromEntries(fd);delete f.kids;f.kids=fd.getAll('kids');
   if(editId){const c=db.contacts.find(c=>c.id===editId);Object.assign(c,f);touch(c)}else db.contacts.push(touch({id:uid(),...f}));
