@@ -3,29 +3,37 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#1e3a5f">
+<meta name="theme-color" content="#5b3df0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="בן יהודה">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>ניהול משימות משפחת בן יהודה</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg">
-<link rel="apple-touch-icon" href="icon.svg">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <header class="top">
-  <div class="brand">
-    <img src="icon.svg" alt="" width="40" height="40">
-    <h1>משפחת בן יהודה</h1>
+  <div class="brand"><img src="icon.svg" alt="" width="38" height="38"><span>בן יהודה</span></div>
+  <div class="topBtns">
+    <button id="installBtn" class="chip" hidden>📲 התקנה</button>
+    <button id="notifBtn" class="chip">🔔 תזכורות</button>
   </div>
-  <button id="notifBtn" class="chip" title="הפעלת תזכורות">🔔 תזכורות</button>
 </header>
 
 <main>
   <!-- דשבורד -->
   <section id="tab-home" class="tab active">
-    <div class="card clockCard">
+    <div class="hero">
+      <div class="orb o1"></div><div class="orb o2"></div>
+      <div id="greet" class="greet"></div>
       <div id="clock" class="clock">--:--</div>
       <div id="dateLine" class="dateLine"></div>
-      <div id="hebLine" class="hebLine"></div>
+      <div id="todaySum" class="todaySum"></div>
     </div>
     <div class="card">
       <div class="calHead">
@@ -75,7 +83,8 @@
       <input name="note" placeholder="הערה קצרה (קשר משפחתי…)">
       <div class="lbl">שייך לילדות (אפשר כמה)</div>
       <div id="kidChecks" class="checks"></div>
-      <button class="btn">＋ שמור</button>
+      <button class="btn" id="contactSave">＋ שמור</button>
+      <button type="button" class="btn ghost" id="contactCancel" hidden>ביטול עריכה</button>
     </form>
   </section>
 
@@ -126,12 +135,13 @@
 <div class="kids" id="kids"></div>
 
 <nav class="tabs">
-  <button data-t="home" class="on"><span>🏠</span>בית</button>
-  <button data-t="contacts"><span>👥</span>אנשי קשר</button>
-  <button data-t="notes"><span>📝</span>הערות</button>
-  <button data-t="admin"><span>🔐</span>ניהול</button>
+  <button data-t="home" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg><em>בית</em></button>
+  <button data-t="contacts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><circle cx="17.5" cy="9" r="2.5"/><path d="M17 14.2c2.6.2 4.5 2 4.5 4.8"/></svg><em>אנשי קשר</em></button>
+  <button data-t="notes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h10l4 4v14H5z"/><path d="M14 3v5h5M8 13h8M8 17h6"/></svg><em>הערות</em></button>
+  <button data-t="admin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 018 0v3"/></svg><em>ניהול</em></button>
 </nav>
 
+<div id="iosHint" class="toast hint" hidden>באייפון: לחצו על ⬆️ שיתוף ← "הוסף למסך הבית"</div>
 <div id="sheet" class="sheet" hidden>
   <div class="sheetBox"><h3 id="sheetTitle"></h3><div id="sheetBody"></div><button class="btn ghost" id="sheetClose">סגור</button></div>
 </div>

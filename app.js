@@ -4,12 +4,15 @@ const KEY='bny-data-v1';
 let db={tasks:[],events:[],contacts:[],notes:[],fired:{}};
 try{db=Object.assign(db,JSON.parse(localStorage.getItem(KEY)||'{}'))}catch{}
 const CODE_KEY='bny-code';
-const KIDS=[['לינוי','#e0527a'],['רומי','#8e5bd6'],['אלין','#2f9e8f'],['גיל','#e8912d'],['אדה','#3b82c4']];
+const KIDS=[['לינוי','#e0527a'],['רומי','#8e5bd6'],['אלין','#2f9e8f'],['גיל','#e8912d'],['אדוה','#3b82c4']];
 const kidColor=n=>(KIDS.find(k=>k[0]===n)||[])[1]||'#888';
 let kidFilter='';
 let adminPw=localStorage.getItem('bny-admin')||'';
 let syncT;
 db.events.forEach(e=>{if(!e.at)e.at=new Date(`${e.date}T${e.time}`).getTime()});
+// שינוי שם: אדה -> אדוה (נתונים קיימים)
+db.events.forEach(e=>{if(e.kid==='אדה')e.kid='אדוה'});db.tasks.forEach(t=>{if(t.who==='אדה')t.who='אדוה'});
+db.contacts.forEach(c=>{if((c.kids||[]).includes('אדה'))c.kids=c.kids.map(k=>k==='אדה'?'אדוה':k)});
 const save=()=>{localStorage.setItem(KEY,JSON.stringify(db));clearTimeout(syncT);syncT=setTimeout(sync,600)};
 const touch=o=>{o.u=Date.now();return o};
 const live=a=>a.filter(x=>!x.del);
@@ -24,11 +27,20 @@ function toast(t){const e=$('#toast');e.textContent=t;e.hidden=false;setTimeout(
 $$('.tabs button').forEach(b=>b.onclick=()=>{$$('.tabs button').forEach(x=>x.classList.toggle('on',x===b));$$('.tab').forEach(t=>t.classList.toggle('active',t.id==='tab-'+b.dataset.t))});
 function tick(){const d=new Date();
   $('#clock').textContent=d.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
-  $('#dateLine').textContent=d.toLocaleDateString('he-IL',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  $('#hebLine').textContent=d.toLocaleDateString('he-IL-u-ca-hebrew',{day:'numeric',month:'long',year:'numeric'});}
-tick();setInterval(tick,1000);
+  $('#dateLine').textContent=d.toLocaleDateString('he-IL',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}
+function renderToday(){
+  const d=new Date(),h=d.getHours();
+  $('#greet').textContent=(h<5?'לילה טוב':h<12?'בוקר טוב':h<18?'צהריים טובים':h<22?'ערב טוב':'לילה טוב')+' משפחת בן יהודה';
+  const t=iso(d),hm=`${pad(h)}:${pad(d.getMinutes())}`;
+  const ev=live(db.events).filter(e=>e.date===t).sort((a,b)=>a.time.localeCompare(b.time));
+  const nxt=ev.find(e=>e.time>=hm);
+  $('#todaySum').textContent=ev.length?`היום ${ev.length} אירועים`+(nxt?` · הבא: ${nxt.title} ב־${nxt.time}`:''):'';
+}
+tick();setInterval(tick,1000);setInterval(()=>{renderToday();renderKids()},30000);
 function renderKids(){
-  $('#kids').innerHTML=KIDS.map(([n,c])=>`<button class="kid ${kidFilter===n?'on':''}" style="--c:${c}" data-k="${n}">${n}</button>`).join('');
+  const today=iso(new Date());
+  $('#kids').innerHTML=KIDS.map(([n,c])=>{const cnt=live(db.events).filter(e=>e.date===today&&e.kid===n).length;
+    return `<button class="kid ${kidFilter===n?'on':''}" style="--c:${c}" data-k="${n}"><span class="av">${n[0]}</span><span class="nm">${n}</span>${cnt?`<b class="bd">${cnt}</b>`:''}</button>`}).join('');
   const opts='<option value="">כולם</option>'+KIDS.map(k=>`<option>${k[0]}</option>`).join('');
   $('#kidChecks').innerHTML=KIDS.map(([n,c])=>`<label class="ck" style="--c:${c}"><input type="checkbox" name="kids" value="${n}"><span>${n}</span></label>`).join('');
   $('#kidSel').innerHTML=opts;$('#whoSel').innerHTML=opts;
@@ -49,7 +61,7 @@ $('#taskForm').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target);db
 function renderTasks(){
   const today=iso(new Date());
   const l=live(db.tasks).filter(t=>tf==='all'||(tf==='done')===t.done);
-  $('#taskList').innerHTML=l.length?l.map(t=>`<li class="item ${t.done?'done':''} ${!t.done&&t.due&&t.due<today?'late':''}"><button class="check" data-id="${t.id}" data-a="tog">${t.done?'✓':''}</button><div class="main"><b>${esc(t.title)}</b><small>${t.who?`<span class="tag" style="--c:${kidColor(t.who)}">${esc(t.who)}</span> `:''}<small class="d">${t.due?'📅 '+fmtDate(t.due):''}</small></small></div><button class="del" data-id="${t.id}" data-a="del">🗑</button></li>`).join(''):'<li class="empty">אין משימות 🎉</li>';
+  $('#taskList').innerHTML=l.length?l.map(t=>`<li class="item ${t.done?'done':''} ${!t.done&&t.due&&t.due<today?'late':''}" style="--c:${t.who?kidColor(t.who):'var(--b1)'}"><button class="check" data-id="${t.id}" data-a="tog">${t.done?'✓':''}</button><div class="main"><b>${esc(t.title)}</b><small>${t.who?`<span class="tag" style="--c:${kidColor(t.who)}">${esc(t.who)}</span> `:''}<small class="d">${t.due?'📅 '+fmtDate(t.due):''}</small></small></div><button class="del" data-id="${t.id}" data-a="del">🗑</button></li>`).join(''):'<li class="empty">אין משימות 🎉</li>';
 }
 $('#taskList').onclick=e=>{const b=e.target.closest('button');if(!b)return;const t=db.tasks.find(x=>x.id===b.dataset.id);if(b.dataset.a==='tog')touch(t).done=!t.done;else if(confirm('למחוק?')){t.del=1;touch(t)}save();renderTasks()};
 
@@ -59,14 +71,15 @@ function renderCal(){
   const y=view.getFullYear(),m=view.getMonth(),today=iso(new Date());
   $('#monthLabel').textContent=view.toLocaleDateString('he-IL',{month:'long',year:'numeric'});
   const start=new Date(y,m,1-new Date(y,m,1).getDay());
-  const evs=live(db.events).filter(e=>!kidFilter||!e.kid||e.kid===kidFilter);const has=new Set(evs.map(e=>e.date));let h='';
+  const evs=live(db.events).filter(e=>!kidFilter||!e.kid||e.kid===kidFilter);const dm={};evs.forEach(e=>{(dm[e.date]=dm[e.date]||new Set()).add(e.kid?kidColor(e.kid):'#ffc24a')});let h='';
   for(let i=0;i<42;i++){const d=new Date(start);d.setDate(start.getDate()+i);const k=iso(d);
-    h+=`<button class="day ${d.getMonth()!==m?'out':''} ${k===today?'today':''} ${k===sel?'sel':''} ${has.has(k)?'has':''}" data-d="${k}">${d.getDate()}</button>`}
+    h+=`<button class="day ${d.getMonth()!==m?'out':''} ${k===today?'today':''} ${k===sel?'sel':''} " data-d="${k}">${d.getDate()}${dm[k]?`<i class="dots">${[...dm[k]].slice(0,3).map(c=>`<s style="background:${c}"></s>`).join('')}</i>`:''}</button>`}
   $('#days').innerHTML=h;
   $('#selLabel').textContent=fmtDate(sel);
   const ev=evs.filter(e=>e.date===sel).sort((a,b)=>a.time.localeCompare(b.time));
-  $('#eventList').innerHTML=ev.length?ev.map(e=>`<li class="item"><div class="avatar">${esc(e.time)}</div><div class="main"><b>${esc(e.title)}${e.kid?`<span class="tag" style="--c:${kidColor(e.kid)}">${esc(e.kid)}</span>`:''}</b><small>${e.remind>=0?'🔔 '+$('#eventForm [name=remind] option[value="'+e.remind+'"]').textContent:'ללא תזכורת'}</small></div><button class="share" data-s="${e.id}" title="שלח תזכורת">📤</button><button class="del" data-id="${e.id}">🗑</button></li>`).join(''):'<li class="empty">אין אירועים ביום זה</li>';
+  $('#eventList').innerHTML=ev.length?ev.map(e=>`<li class="item" style="--c:${e.kid?kidColor(e.kid):'var(--b1)'}"><div class="avatar">${esc(e.time)}</div><div class="main"><b>${esc(e.title)}${e.kid?`<span class="tag" style="--c:${kidColor(e.kid)}">${esc(e.kid)}</span>`:''}</b><small>${e.remind>=0?'🔔 '+$('#eventForm [name=remind] option[value="'+e.remind+'"]').textContent:'ללא תזכורת'}</small></div><button class="share" data-s="${e.id}" title="שלח תזכורת">📤</button><button class="del" data-id="${e.id}">🗑</button></li>`).join(''):'<li class="empty">אין אירועים ביום זה</li>';
   $('#eventForm [name=date]').value=sel;
+  renderToday();renderKids();
 }
 $('#days').onclick=e=>{const d=e.target.closest('.day');if(!d)return;sel=d.dataset.d;const s=new Date(sel+'T00:00');view=new Date(s.getFullYear(),s.getMonth(),1);renderCal()};
 $('#prevM').onclick=()=>{view.setMonth(view.getMonth()-1);renderCal()};
@@ -141,23 +154,34 @@ setInterval(checkReminders,30000);document.addEventListener('visibilitychange',c
 function renderContacts(){
   const q=$('#search').value.trim().toLowerCase();
   const l=live(db.contacts).filter(c=>(!kidFilter||(c.kids||[]).includes(kidFilter))&&(!q||(c.name+c.phone+c.address+(c.email||'')).toLowerCase().includes(q))).sort((a,b)=>a.name.localeCompare(b.name,'he'));
-  $('#contactList').innerHTML=l.length?l.map(c=>`<li class="item" data-id="${c.id}"><div class="avatar">${esc(c.name[0])}</div><div class="main"><b>${esc(c.name)}</b><small>${esc(c.phone)} ${c.note?'· '+esc(c.note):''}</small><div>${(c.kids||[]).map(k=>`<span class="tag" style="--c:${kidColor(k)}">${esc(k)}</span>`).join('')}</div>${c.address?`<br><button class="addr" data-w="${c.id}">📍 ${esc(c.address)}</button>`:''}</div><button class="del" data-x="${c.id}">🗑</button></li>`).join(''):'<li class="empty">אין אנשי קשר</li>';
+  $('#contactList').innerHTML=l.length?l.map(c=>`<li class="item" data-id="${c.id}"><div class="avatar">${esc(c.name[0])}</div><div class="main"><b>${esc(c.name)}</b><small>${esc(c.phone)} ${c.note?'· '+esc(c.note):''}</small><div>${(c.kids||[]).map(k=>`<span class="tag" style="--c:${kidColor(k)}">${esc(k)}</span>`).join('')}</div>${c.address?`<br><button class="addr" data-w="${c.id}">📍 ${esc(c.address)}</button>`:''}</div>${c.address?`<button class="wazeBtn" data-w="${c.id}" aria-label="Waze">🚗<span>Waze</span></button>`:''}<button class="del" data-x="${c.id}">🗑</button></li>`).join(''):'<li class="empty">אין אנשי קשר</li>';
   const sel=$('#noteContact');const v=sel.value;
   sel.innerHTML='<option value="">ללא איש קשר</option>'+live(db.contacts).map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');sel.value=v;
 }
 $('#search').oninput=renderContacts;
-$('#contactForm').onsubmit=e=>{e.preventDefault();const fd=new FormData(e.target);const f=Object.fromEntries(fd);delete f.kids;db.contacts.push(touch({id:uid(),...f,kids:fd.getAll('kids')}));save();e.target.reset();renderContacts()};
+let editId='';
+function endEdit(){editId='';$('#contactForm').reset();$('#contactForm h3').textContent='איש קשר חדש';$('#contactSave').textContent='＋ שמור';$('#contactCancel').hidden=true}
+function editContact(c){editId=c.id;const f=$('#contactForm');
+  for(const k of ['name','phone','email','address','note'])f.elements[k].value=c[k]||'';
+  $$('#kidChecks input').forEach(i=>i.checked=(c.kids||[]).includes(i.value));
+  f.querySelector('h3').textContent='עריכת איש קשר';$('#contactSave').textContent='שמור שינויים';$('#contactCancel').hidden=false;
+  f.scrollIntoView({behavior:'smooth',block:'center'})}
+$('#contactCancel').onclick=endEdit;
+$('#contactForm').onsubmit=e=>{e.preventDefault();const fd=new FormData(e.target);const f=Object.fromEntries(fd);delete f.kids;f.kids=fd.getAll('kids');
+  if(editId){const c=db.contacts.find(c=>c.id===editId);Object.assign(c,f);touch(c)}else db.contacts.push(touch({id:uid(),...f}));
+  save();endEdit();renderContacts()};
 $('#contactList').onclick=e=>{
   const x=e.target.closest('[data-x]');if(x){if(confirm('למחוק?')){const c=db.contacts.find(c=>c.id===x.dataset.x);c.del=1;touch(c);save();renderContacts()}return}
   const w=e.target.closest('[data-w]');if(w){const c=db.contacts.find(c=>c.id===w.dataset.w);open(waze(c.address),'_blank');return}
   const it=e.target.closest('.item');if(!it)return;const c=db.contacts.find(c=>c.id===it.dataset.id);
   const notes=live(db.notes).filter(n=>n.contact===c.id);
-  let h='';
+  let h=c.address?`<a class="act waze" href="${waze(c.address)}" target="_blank" rel="noopener">🚗 <span><b>נווט ב-Waze</b><br><small>${esc(c.address)}</small></span></a>`:`<div class="act" style="opacity:.7">📍 אין כתובת – לחץ "ערוך" כדי להוסיף</div>`;
   if(c.phone)h+=`<a class="act" href="tel:${esc(c.phone)}">📞 התקשר ${esc(c.phone)}</a><a class="act" href="sms:${esc(c.phone)}">💬 שלח SMS</a><a class="act" href="https://wa.me/${intl(c.phone)}" target="_blank">🟢 וואטסאפ</a>`;
   if(c.email)h+=`<a class="act" href="mailto:${esc(c.email)}">✉️ שלח מייל ${esc(c.email)}</a>`;
-  if(c.address)h+=`<a class="act" href="${waze(c.address)}" target="_blank">🚗 נווט ב-Waze: ${esc(c.address)}</a>`;
   if(notes.length)h+=notes.map(n=>`<div class="act">📝 <span><b>${esc(n.title)}</b><br>${esc(n.text)}</span></div>`).join('');
-  sheet(c.name,h||'<p class="empty">אין פרטים</p>');
+  h+=`<button class="act" data-edit="${c.id}">✏️ ערוך איש קשר</button>`;
+  sheet(c.name,h);
+  $('#sheetBody [data-edit]').onclick=()=>{$('#sheet').hidden=true;editContact(c)};
 };
 
 // notes
@@ -185,6 +209,18 @@ $('#otpForm').onsubmit=async e=>{e.preventDefault();
     if(!r.ok)return toast('קוד שגוי או שפג תוקפו');
     const {token}=await r.json();adminPw=token;localStorage.setItem('bny-admin',token);e.target.reset();e.target.hidden=true;renderAdmin();sync()}catch{toast('אין חיבור לשרת')}};
 $('#lockBtn').onclick=()=>{adminPw='';localStorage.removeItem('bny-admin');renderAdmin()};
-function renderAll(){renderKids();renderAdmin();renderCal();renderContacts();renderNotes()}
+function renderAll(){renderToday();renderKids();renderAdmin();renderCal();renderContacts();renderNotes()}
 renderAll();updNotifBtn();checkReminders();sync();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+
+// התקנה כאפליקציה (אנדרואיד / אייפון)
+const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone;
+const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
+let installEv=null;
+addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEv=e;if(!standalone)$('#installBtn').hidden=false});
+if(isIOS&&!standalone)$('#installBtn').hidden=false;
+$('#installBtn').onclick=async()=>{
+  if(installEv){installEv.prompt();await installEv.userChoice;installEv=null;$('#installBtn').hidden=true}
+  else if(isIOS){const t=$('#iosHint');t.hidden=false;setTimeout(()=>t.hidden=true,7000)}
+};
+addEventListener('appinstalled',()=>$('#installBtn').hidden=true);
