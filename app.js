@@ -27,13 +27,15 @@ const fmtDate=s=>new Date(s+'T00:00').toLocaleDateString('he-IL',{weekday:'long'
 function toast(t){const e=$('#toast');e.textContent=t;e.hidden=false;setTimeout(()=>e.hidden=true,2200)}
 
 // tabs
-$$('.tabs button').forEach(b=>b.onclick=()=>{$$('.tabs button').forEach(x=>x.classList.toggle('on',x===b));$$('.tab').forEach(t=>t.classList.toggle('active',t.id==='tab-'+b.dataset.t))});
+let curTab='home';
+function showTab(t){curTab=t;$$('.tabs button').forEach(x=>x.classList.toggle('on',x.dataset.t===t));$$('.tab').forEach(x=>x.classList.toggle('active',x.id==='tab-'+t));if(typeof renderKids==='function')renderKids();scrollTo({top:0})}
+$$('.tabs button').forEach(b=>b.onclick=()=>showTab(b.dataset.t));
 function tick(){const d=new Date();
   $('#clock').textContent=d.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
   $('#dateLine').textContent=d.toLocaleDateString('he-IL',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}
 function renderToday(){
   const d=new Date(),h=d.getHours();
-  $('#greet').textContent=(h<5?'לילה טוב':h<12?'בוקר טוב':h<18?'צהריים טובים':h<22?'ערב טוב':'לילה טוב')+' '+(myName||'משפחת בן יהודה');
+  $('#greet').textContent=(h<5?'לילה טוב':h<12?'בוקר טוב':h<18?'צהריים טובים':h<22?'ערב טוב':'לילה טוב')+(myName?', '+myName+' 👋':' משפחת בן יהודה');
   const t=iso(d),hm=`${pad(h)}:${pad(d.getMinutes())}`;
   const ev=live(db.events).filter(e=>e.date===t).sort((a,b)=>a.time.localeCompare(b.time));
   const nxt=ev.find(e=>e.time>=hm);
@@ -42,13 +44,13 @@ function renderToday(){
 tick();setInterval(tick,1000);setInterval(()=>{renderToday();renderKids()},30000);
 function renderKids(){
   const today=iso(new Date());
-  $('#kids').innerHTML=KIDS.map(([n,c])=>{const cnt=live(db.events).filter(e=>e.date===today&&e.kid===n).length;
-    return `<button class="kid ${kidFilter===n?'on':''}" style="--c:${c}" data-k="${n}"><span class="av">${n[0]}</span><span class="nm">${n}</span>${cnt?`<b class="bd">${cnt}</b>`:''}</button>`}).join('');
+  $('#kids').innerHTML=`<button class="kid home ${!kidFilter&&curTab==='home'?'on':''}" style="--c:#6d4aff" data-k="">🏠 בית</button>`+KIDS.map(([n,c])=>{const cnt=live(db.events).filter(e=>e.date===today&&e.kid===n).length;
+    return `<button class="kid ${kidFilter===n?'on':''} ${myName===n?'me':''}" style="--c:${c}" data-k="${n}"><span class="nm">${n}</span>${cnt?`<b class="bd">${cnt}</b>`:''}</button>`}).join('');
   const opts='<option value="">כולם</option>'+KIDS.map(k=>`<option>${k[0]}</option>`).join('');
   $('#kidChecks').innerHTML=KIDS.map(([n,c])=>`<label class="ck" style="--c:${c}"><input type="checkbox" name="kids" value="${n}"><span>${n}</span></label>`).join('');
   $('#kidSel').innerHTML=opts;$('#whoSel').innerHTML=opts;
 }
-$('#kids').onclick=e=>{const b=e.target.closest('.kid');if(!b)return;kidFilter=kidFilter===b.dataset.k?'':b.dataset.k;renderKids();renderCal()};
+$('#kids').onclick=e=>{const b=e.target.closest('.kid');if(!b)return;const k=b.dataset.k;if(!k){kidFilter='';showTab('home')}else kidFilter=kidFilter===k?'':k;renderKids();renderCal();renderContacts()};
 
 // sheet
 function sheet(title,html){$('#sheetTitle').textContent=title;$('#sheetBody').innerHTML=html;$('#sheet').hidden=false}
