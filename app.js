@@ -84,15 +84,17 @@ function renderCal(){
   $('#days').innerHTML=h;
   $('#selLabel').textContent=fmtDate(sel);
   const ev=evs.filter(e=>REC.occursOn(e,sel)).sort((a,b)=>a.time.localeCompare(b.time));
-  $('#eventList').innerHTML=ev.length?ev.map(e=>`<li class="item" style="--c:${evKids(e).length?kidColor(evKids(e)[0]):'var(--b1)'}"><div class="avatar">${esc(e.time)}</div><div class="main"><b>${esc(e.title)}${kidTags(evKids(e))}</b><small>${e.rep?'🔁 '+REC.LABEL[e.rep]+(e.until?' עד '+e.until:'')+' · ':''}${e.nag?'🔂 כל '+e.nag+' דק׳ · ':''}${e.remind>=0?'🔔 '+$('#eventForm [name=remind] option[value="'+e.remind+'"]').textContent:'ללא תזכורת'}</small></div><button class="share" data-s="${e.id}" title="שלח תזכורת">📤</button><button class="del" data-id="${e.id}">🗑</button></li>`).join(''):'<li class="empty">אין אירועים ביום זה</li>';
+  $('#eventList').innerHTML=ev.length?ev.map(e=>`<li class="item" style="--c:${evKids(e).length?kidColor(evKids(e)[0]):'var(--b1)'}"><div class="avatar">${esc(e.time)}</div><div class="main"><b>${esc(e.title)}${kidTags(evKids(e))}</b><small>${e.rep?'🔁 '+REC.LABEL[e.rep]+(e.until?' עד '+e.until:'')+' · ':''}${e.nag?'🔂 כל '+e.nag+' דק׳ · ':''}${e.remind>=0?'🔔 '+$('#eventForm [name=remind] option[value="'+e.remind+'"]').textContent:'ללא תזכורת'}</small></div>${e.img?`<img class="evImg" data-img="${e.img}" alt="תמונה">`:''}<button class="share" data-s="${e.id}" title="שלח תזכורת">📤</button><button class="del" data-id="${e.id}">🗑</button></li>`).join(''):'<li class="empty">אין אירועים ביום זה</li>';
   if($('#eventModal').hidden)$('#eventForm [name=date]').value=sel;
-  renderToday();renderKids();
+  hydrateImgs();renderToday();renderKids();
 }
 $('#days').onclick=e=>{const d=e.target.closest('.day');if(!d)return;sel=d.dataset.d;$('#eventForm [name=date]').value=sel;const s=new Date(sel+'T00:00');view=new Date(s.getFullYear(),s.getMonth(),1);renderCal()};
 $('#prevM').onclick=()=>{view.setMonth(view.getMonth()-1);renderCal()};
 $('#nextM').onclick=()=>{view.setMonth(view.getMonth()+1);renderCal()};
 $('#goToday').onclick=()=>{sel=iso(new Date());view=new Date();view.setDate(1);renderCal()};
-$('#eventForm').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target);const tm=f.get('time')||'00:00';db.events.push(touch({id:uid(),title:f.get('title'),date:f.get('date'),time:tm,kids:f.getAll('ekids'),rep:f.get('rep')||'',nag:+f.get('nag')||0,until:f.get('rep')?(f.get('until')||''):'',at:new Date(`${f.get('date')}T${tm}`).getTime(),remind:+f.get('remind')}));sel=f.get('date');save();e.target.title.value='';$$('#evKids input').forEach(i=>i.checked=false);e.target.rep.value='';e.target.nag.value='0';$('#untilWrap').hidden=true;$('#eventModal').hidden=true;renderCal();checkReminders();if(+f.get('remind')>=0&&Notification.permission==='default')askNotif()};
+$('#eventForm').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);let imgId='';
+  if(pendingImg){try{const r=await fetch('/api/image',{method:'POST',headers:hdr(),body:JSON.stringify({data:pendingImg})});if(r.ok)imgId=(await r.json()).id;else toast('העלאת התמונה נכשלה – האירוע נשמר בלי תמונה')}catch{toast('העלאת התמונה נכשלה – האירוע נשמר בלי תמונה')}}
+  const tm=f.get('time')||'00:00';db.events.push(touch({id:uid(),title:f.get('title'),date:f.get('date'),time:tm,kids:f.getAll('ekids'),img:imgId,rep:f.get('rep')||'',nag:+f.get('nag')||0,until:f.get('rep')?(f.get('until')||''):'',at:new Date(`${f.get('date')}T${tm}`).getTime(),remind:+f.get('remind')}));sel=f.get('date');save();e.target.title.value='';$$('#evKids input').forEach(i=>i.checked=false);e.target.rep.value='';e.target.nag.value='5';clearImg();$('#untilWrap').hidden=true;$('#eventModal').hidden=true;renderCal();checkReminders();if(+f.get('remind')>=0&&Notification.permission==='default')askNotif()};
 function shareEvent(ev){
   const ek=evKids(ev);const txt=`תזכורת: ${ev.title}${ek.length?' ('+ek.join(', ')+')':''} – ${fmtDate(ev.date)} בשעה ${ev.time}`;
   const cs=live(db.contacts).filter(c=>(c.phone||c.email)&&(!ek.length||!(c.kids||[]).length||ek.some(k=>(c.kids||[]).includes(k))));
@@ -101,7 +103,7 @@ function shareEvent(ev){
   h+=`<a class="act" href="https://wa.me/?text=${encodeURIComponent(txt)}" target="_blank">🟢 וואטסאפ – בחירת נמען / קבוצה</a>`;
   sheet('שליחת תזכורת',h);
 }
-$('#eventList').onclick=e=>{const s=e.target.closest('.share');if(s)return shareEvent(db.events.find(x=>x.id===s.dataset.s));const b=e.target.closest('.del');if(b&&confirm((db.events.find(x=>x.id===b.dataset.id)||{}).rep?'למחוק את כל האירועים החוזרים של האירוע הזה?':'למחוק?')){const x=db.events.find(x=>x.id===b.dataset.id);x.del=1;touch(x);save();renderCal()}};
+$('#eventList').onclick=e=>{const im=e.target.closest('.evImg');if(im)return showImage(im.dataset.img);const s=e.target.closest('.share');if(s)return shareEvent(db.events.find(x=>x.id===s.dataset.s));const b=e.target.closest('.del');if(b&&confirm((db.events.find(x=>x.id===b.dataset.id)||{}).rep?'למחוק את כל האירועים החוזרים של האירוע הזה?':'למחוק?')){const x=db.events.find(x=>x.id===b.dataset.id);x.del=1;touch(x);if(x.img)fetch('/api/image?id='+x.img,{method:'DELETE',headers:hdr()}).catch(()=>{});save();renderCal()}};
 
 // reminders (שרת-פוש חיצוני אינו נדרש: התראות מקומיות בכל מכשיר שבו האפליקציה מותקנת)
 // צלילי התראה לבחירה (מושמעים כשהאפליקציה פתוחה; כשהיא סגורה הצליל נקבע בהגדרות הטלפון)
@@ -342,3 +344,18 @@ function showAlarm(r){
 }
 $('#alarmStop').onclick=()=>{stopRing();$('#alarm').hidden=true;if(alarmR&&alarmR.e)fetch('/api/ack',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({eid:alarmR.e,at:alarmR.a})}).catch(()=>{})};
 $('#alarmSnooze').onclick=async()=>{stopRing();$('#alarm').hidden=true;const r=alarmR||{};await snoozeFor(r,10);if(!r.e)setTimeout(()=>showAlarm(r),10*60000)};
+
+// תמונה לאירוע: מכווצים בדפדפן, מעלים לשרת, ומציגים לפי מזהה
+let pendingImg='';const imgCache=new Map();
+function compress(file,max=1280,q=.72){return new Promise((res,rej)=>{const im=new Image(),u=URL.createObjectURL(file);
+  im.onload=()=>{const s=Math.min(1,max/Math.max(im.width,im.height)),w=Math.round(im.width*s),h=Math.round(im.height*s),c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(im,0,0,w,h);URL.revokeObjectURL(u);res(c.toDataURL('image/jpeg',q))};
+  im.onerror=()=>rej(new Error('bad image'));im.src=u})}
+function clearImg(){pendingImg='';$('#evImgPrev').hidden=true;$('#evImgFile').value=''}
+$('#evImgBtn').onclick=()=>$('#evImgFile').click();
+$('#evImgFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;
+  try{pendingImg=await compress(f);$('#evImgThumb').src=pendingImg;$('#evImgPrev').hidden=false}catch{toast('לא הצלחתי לקרוא את התמונה');clearImg()}};
+$('#evImgDel').onclick=clearImg;
+async function getImg(id){if(imgCache.has(id))return imgCache.get(id);
+  try{const r=await fetch('/api/image?id='+id,{headers:hdr()});if(!r.ok)return '';const d=(await r.json()).data;imgCache.set(id,d);return d}catch{return ''}}
+function hydrateImgs(){$$('img[data-img]').forEach(async im=>{if(im.src)return;const d=await getImg(im.dataset.img);if(d)im.src=d;else im.style.display='none'})}
+async function showImage(id){const d=await getImg(id);if(d)sheet('תמונה',`<img src="${d}" alt="" style="width:100%;border-radius:16px">`)}

@@ -141,6 +141,11 @@
     <form id="eventForm" class="form">
       <h3>אירוע חדש</h3>
       <input name="title" placeholder="שם האירוע (למשל: חוג ריקוד)" required>
+      <div class="imgPick">
+        <button type="button" class="btn ghost" id="evImgBtn">📷 הוספת תמונה</button>
+        <input type="file" id="evImgFile" accept="image/*" hidden>
+        <div id="evImgPrev" class="imgPrev" hidden><img id="evImgThumb" alt=""><button type="button" id="evImgDel" aria-label="הסר תמונה">✕</button></div>
+      </div>
       <label class="lbl">תאריך<input name="date" type="date" required></label>
       <div class="lbl">שעה</div>
       <div class="timeRow" dir="ltr"><select id="evH" aria-label="שעה"></select><b>:</b><select id="evM" aria-label="דקות"></select></div>

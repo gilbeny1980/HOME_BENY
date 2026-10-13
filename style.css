@@ -118,3 +118,7 @@ summary.btn{list-style:none;text-align:center}summary::-webkit-details-marker{di
 @keyframes ring{0%,100%{transform:rotate(0)}10%{transform:rotate(18deg)}20%{transform:rotate(-16deg)}30%{transform:rotate(14deg)}40%{transform:rotate(-12deg)}50%{transform:rotate(8deg)}60%{transform:rotate(0)}}
 .timeRow select{font-size:16px;font-weight:500;padding:12px 14px;text-align:center;text-align-last:center}.timeRow b{font-size:18px}
 .qt{padding:6px 10px;font-size:13px}
+.imgPick{display:flex;flex-direction:column;gap:8px}.imgPick .btn.ghost{margin-top:0}
+.imgPrev{position:relative;width:96px}.imgPrev img{width:96px;height:96px;object-fit:cover;border-radius:16px;display:block}
+.imgPrev button{position:absolute;top:-8px;inset-inline-start:-8px;width:26px;height:26px;border-radius:50%;border:0;background:#e5484d;color:#fff;cursor:pointer}
+.evImg{width:52px;height:52px;border-radius:14px;object-fit:cover;flex:none;cursor:pointer;background:var(--bg)}

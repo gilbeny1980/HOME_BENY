@@ -13,6 +13,7 @@ function init() {
     'CREATE TABLE IF NOT EXISTS otp_log (ts INTEGER)',
     'CREATE TABLE IF NOT EXISTS sess (h TEXT PRIMARY KEY, exp INTEGER, role TEXT, uname TEXT)',
     'CREATE TABLE IF NOT EXISTS login_log (ts INTEGER)',
+    'CREATE TABLE IF NOT EXISTS images (id TEXT PRIMARY KEY, data TEXT)',
     'CREATE TABLE IF NOT EXISTS snoozes (id INTEGER PRIMARY KEY AUTOINCREMENT, endpoint TEXT, t INTEGER, title TEXT, body TEXT, eid TEXT, at INTEGER)',
   ]).then(() => client().execute('ALTER TABLE subs ADD COLUMN uname TEXT').catch(() => {})).catch(e => { ready = null; throw e; });
   return ready;
