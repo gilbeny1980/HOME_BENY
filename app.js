@@ -111,17 +111,20 @@ $('#goToday').onclick=()=>{sel=iso(new Date());view=new Date();view.setDate(1);r
 $('#eventForm').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);let imgId=curImg;
   if(pendingImg){try{const r=await fetch('/api/image',{method:'POST',headers:hdr(),body:JSON.stringify({data:pendingImg})});if(r.ok)imgId=(await r.json()).id;else toast('העלאת התמונה נכשלה')}catch{toast('העלאת התמונה נכשלה')}}
   if(origImg&&imgId!==origImg)fetch('/api/image?id='+origImg,{method:'DELETE',headers:hdr()}).catch(()=>{});
-  const tm=f.get('time')||'00:00',rep=f.get('rep')||'';
+  const tm=f.get('time')||'00:00',rep=f.get('rep')||'';let saved=null;
   const data={title:f.get('title'),date:f.get('date'),time:tm,kids:f.getAll('ekids'),img:imgId,rep,nag:+f.get('nag')||0,until:rep?(f.get('until')||''):'',at:new Date(`${f.get('date')}T${tm}`).getTime(),remind:+f.get('remind')};
-  if(editEv){const x=db.events.find(v=>v.id===editEv);if(x){Object.assign(x,data);delete x.kid;touch(x)}}else db.events.push(touch({id:uid(),...data}));
+  if(editEv){const x=db.events.find(v=>v.id===editEv);if(x){Object.assign(x,data);delete x.kid;touch(x)}}else{saved=touch({id:uid(),...data});db.events.push(saved)}
   sel=f.get('date');save();editEv='';clearImg();$('#eventModal').hidden=true;renderCal();checkReminders();
+  if(saved&&f.get('wa'))setTimeout(()=>shareEvent(saved),300);
+  e.target.wa.checked=false;
   if(+f.get('remind')>=0&&Notification.permission==='default')askNotif()};
 function shareEvent(ev){
   const ek=evKids(ev);const txt=`תזכורת: ${ev.title}${ek.length?' ('+ek.join(', ')+')':''} – ${fmtDate(ev.date)} בשעה ${ev.time}`;
+  const q=encodeURIComponent(txt);
   const cs=live(db.contacts).filter(c=>(c.phone||c.email)&&(!ek.length||!(c.kids||[]).length||ek.some(k=>(c.kids||[]).includes(k))));
-  let h=`<p class="mut">${esc(txt)}</p>`;
-  h+=cs.map(c=>`<div class="act"><b style="flex:1">${esc(c.name)}</b>${c.phone?`<a href="https://wa.me/${intl(c.phone)}?text=${encodeURIComponent(txt)}" target="_blank">🟢</a><a href="sms:${esc(c.phone)}?&body=${encodeURIComponent(txt)}">💬</a>`:''}${c.email?`<a href="mailto:${esc(c.email)}?subject=${encodeURIComponent('תזכורת: '+ev.title)}&body=${encodeURIComponent(txt)}">✉️</a>`:''}</div>`).join('')||'<p class="empty">אין אנשי קשר מתאימים</p>';
-  h+=`<a class="act" href="https://wa.me/?text=${encodeURIComponent(txt)}" target="_blank">🟢 וואטסאפ – בחירת נמען / קבוצה</a>`;
+  let h=`<p class="mut" style="margin-bottom:12px">${esc(txt)}</p>`;
+  h+=`<a class="act wa" href="https://wa.me/?text=${q}" target="_blank" rel="noopener">🟢 <span><b>שלח בוואטסאפ לקבוצה / לאדם</b><br><small>בחר בוואטסאפ למי לשלוח</small></span></a>`;
+  h+=cs.map(c=>`<div class="act" style="flex-wrap:wrap"><b style="flex:1;min-width:90px">${esc(c.name)}</b>${c.phone?`<a class="miniWa" href="https://wa.me/${intl(c.phone)}?text=${q}" target="_blank" rel="noopener">🟢 וואטסאפ</a><a href="sms:${esc(c.phone)}?&body=${q}">💬</a>`:''}${c.email?`<a href="mailto:${esc(c.email)}?subject=${encodeURIComponent('תזכורת: '+ev.title)}&body=${q}">✉️</a>`:''}</div>`).join('');
   sheet('שליחת תזכורת',h);
 }
 $('#eventList').onclick=e=>{const im=e.target.closest('.evImg');if(im)return showImage(im.dataset.img);const ed=e.target.closest('[data-ed]');if(ed)return openEventForm(db.events.find(x=>x.id===ed.dataset.ed));const s=e.target.closest('.share');if(s)return shareEvent(db.events.find(x=>x.id===s.dataset.s));const b=e.target.closest('.del');if(b&&confirm((db.events.find(x=>x.id===b.dataset.id)||{}).rep?'למחוק את כל האירועים החוזרים של האירוע הזה?':'למחוק?')){const x=db.events.find(x=>x.id===b.dataset.id);x.del=1;touch(x);if(x.img)fetch('/api/image?id='+x.img,{method:'DELETE',headers:hdr()}).catch(()=>{});save();renderCal()}};
