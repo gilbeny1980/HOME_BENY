@@ -1,5 +1,5 @@
 const webpush = require('web-push');
-const { markFired, subsAll, subDel, getJSON, getUsers } = require('./_lib');
+const { markFired, wasFired, subsAll, subDel, subGet, snoozesDue, snoozeDel, getJSON, getUsers } = require('./_lib');
 const REC = require('../rec.js');
 // Called every 5 minutes by GitHub Actions. Public on purpose: it only sends reminders that are already due,
 // and each reminder is sent once (markFired), so calling it extra times is harmless.
@@ -24,10 +24,20 @@ module.exports = async (req, res) => {
     for (const e of (db.events || [])) {
       if (e.del || !(e.remind >= 0) || !e.date) continue;
       const kids = e.kids && e.kids.length ? e.kids : (e.kid ? [e.kid] : []);
+      const nag = Number(e.nag) > 0 ? Number(e.nag) : 0;
       for (const date of REC.occDates(e, toDate)) {
-        const at = REC.ilToMs(date, e.time);
-        if (now >= at - e.remind * 60000 && now < at + 3600000 && await markFired(`${e.id}:${at}`)) {
-          msgs.push({ title: 'תזכורת: ' + e.title + (kids.length ? ` (${kids.join(', ')})` : ''), body: `${date} בשעה ${e.time}`, to: recipients(kids) });
+        const at = REC.ilToMs(date, e.time), fire = at - e.remind * 60000;
+        if (now < fire || now >= at + 3600000) continue;
+        const title = 'תזכורת: ' + e.title + (kids.length ? ` (${kids.join(', ')})` : ''), body = `${date} בשעה ${e.time}`, to = recipients(kids);
+        const first = await markFired(`${e.id}:${at}`);
+        if (first) msgs.push({ title, body, to, eid: e.id, at });
+        // repeat every `nag` minutes (up to 3 times) until someone taps "got it" or snoozes
+        if (nag && !first && !(await wasFired(`ack:${e.id}:${at}`))) {
+          const k = Math.min(3, Math.floor((now - fire) / (nag * 60000)));
+          if (k >= 1) {
+            for (let j = 1; j < k; j++) await markFired(`${e.id}:${at}:n${j}`);
+            if (await markFired(`${e.id}:${at}:n${k}`)) msgs.push({ title: '🔁 ' + title, body, to, eid: e.id, at });
+          }
         }
       }
     }
@@ -42,8 +52,16 @@ module.exports = async (req, res) => {
     let sent = 0;
     for (const m of msgs) for (const { sub, uname } of subs) {
       if (m.to && uname && uname !== 'admin' && !m.to.includes(uname)) continue;
-      try { await webpush.sendNotification(sub, JSON.stringify({ title: m.title, body: m.body })); sent++; }
+      try { await webpush.sendNotification(sub, JSON.stringify({ title: m.title, body: m.body, eid: m.eid || '', at: m.at || 0 })); sent++; }
       catch (err) { if (err.statusCode === 404 || err.statusCode === 410) await subDel(sub.endpoint); }
+    }
+    // due snoozes go back only to the device that asked
+    for (const s of await snoozesDue(now)) {
+      const sub = await subGet(s.endpoint);
+      await snoozeDel(s.id);
+      if (!sub) continue;
+      try { await webpush.sendNotification(sub, JSON.stringify({ title: '⏰ ' + s.title, body: s.body, eid: s.eid, at: Number(s.at) })); sent++; }
+      catch (err) { if (err.statusCode === 404 || err.statusCode === 410) await subDel(s.endpoint); }
     }
     res.status(200).json({ messages: msgs.length, sent });
   } catch (e) { res.status(500).json({ error: String(e.message || e) }); }

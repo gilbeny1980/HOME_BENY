@@ -82,7 +82,7 @@ function renderCal(){
   $('#days').innerHTML=h;
   $('#selLabel').textContent=fmtDate(sel);
   const ev=evs.filter(e=>REC.occursOn(e,sel)).sort((a,b)=>a.time.localeCompare(b.time));
-  $('#eventList').innerHTML=ev.length?ev.map(e=>`<li class="item" style="--c:${evKids(e).length?kidColor(evKids(e)[0]):'var(--b1)'}"><div class="avatar">${esc(e.time)}</div><div class="main"><b>${esc(e.title)}${kidTags(evKids(e))}</b><small>${e.rep?'🔁 '+REC.LABEL[e.rep]+(e.until?' עד '+e.until:'')+' · ':''}${e.remind>=0?'🔔 '+$('#eventForm [name=remind] option[value="'+e.remind+'"]').textContent:'ללא תזכורת'}</small></div><button class="share" data-s="${e.id}" title="שלח תזכורת">📤</button><button class="del" data-id="${e.id}">🗑</button></li>`).join(''):'<li class="empty">אין אירועים ביום זה</li>';
+  $('#eventList').innerHTML=ev.length?ev.map(e=>`<li class="item" style="--c:${evKids(e).length?kidColor(evKids(e)[0]):'var(--b1)'}"><div class="avatar">${esc(e.time)}</div><div class="main"><b>${esc(e.title)}${kidTags(evKids(e))}</b><small>${e.rep?'🔁 '+REC.LABEL[e.rep]+(e.until?' עד '+e.until:'')+' · ':''}${e.nag?'🔂 כל '+e.nag+' דק׳ · ':''}${e.remind>=0?'🔔 '+$('#eventForm [name=remind] option[value="'+e.remind+'"]').textContent:'ללא תזכורת'}</small></div><button class="share" data-s="${e.id}" title="שלח תזכורת">📤</button><button class="del" data-id="${e.id}">🗑</button></li>`).join(''):'<li class="empty">אין אירועים ביום זה</li>';
   $('#eventForm [name=date]').value=sel;
   renderToday();renderKids();
 }
@@ -90,7 +90,7 @@ $('#days').onclick=e=>{const d=e.target.closest('.day');if(!d)return;sel=d.datas
 $('#prevM').onclick=()=>{view.setMonth(view.getMonth()-1);renderCal()};
 $('#nextM').onclick=()=>{view.setMonth(view.getMonth()+1);renderCal()};
 $('#goToday').onclick=()=>{sel=iso(new Date());view=new Date();view.setDate(1);renderCal()};
-$('#eventForm').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target);const tm=f.get('time')||'00:00';db.events.push(touch({id:uid(),title:f.get('title'),date:f.get('date'),time:tm,kids:f.getAll('ekids'),rep:f.get('rep')||'',until:f.get('rep')?(f.get('until')||''):'',at:new Date(`${f.get('date')}T${tm}`).getTime(),remind:+f.get('remind')}));sel=f.get('date');save();e.target.title.value='';$$('#evKids input').forEach(i=>i.checked=false);e.target.rep.value='';$('#untilWrap').hidden=true;e.target.closest('details').open=false;renderCal();checkReminders();if(+f.get('remind')>=0&&Notification.permission==='default')askNotif()};
+$('#eventForm').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target);const tm=f.get('time')||'00:00';db.events.push(touch({id:uid(),title:f.get('title'),date:f.get('date'),time:tm,kids:f.getAll('ekids'),rep:f.get('rep')||'',nag:+f.get('nag')||0,until:f.get('rep')?(f.get('until')||''):'',at:new Date(`${f.get('date')}T${tm}`).getTime(),remind:+f.get('remind')}));sel=f.get('date');save();e.target.title.value='';$$('#evKids input').forEach(i=>i.checked=false);e.target.rep.value='';e.target.nag.value='0';$('#untilWrap').hidden=true;e.target.closest('details').open=false;renderCal();checkReminders();if(+f.get('remind')>=0&&Notification.permission==='default')askNotif()};
 function shareEvent(ev){
   const ek=evKids(ev);const txt=`תזכורת: ${ev.title}${ek.length?' ('+ek.join(', ')+')':''} – ${fmtDate(ev.date)} בשעה ${ev.time}`;
   const cs=live(db.contacts).filter(c=>(c.phone||c.email)&&(!ek.length||!(c.kids||[]).length||ek.some(k=>(c.kids||[]).includes(k))));
@@ -102,7 +102,12 @@ function shareEvent(ev){
 $('#eventList').onclick=e=>{const s=e.target.closest('.share');if(s)return shareEvent(db.events.find(x=>x.id===s.dataset.s));const b=e.target.closest('.del');if(b&&confirm((db.events.find(x=>x.id===b.dataset.id)||{}).rep?'למחוק את כל האירועים החוזרים של האירוע הזה?':'למחוק?')){const x=db.events.find(x=>x.id===b.dataset.id);x.del=1;touch(x);save();renderCal()}};
 
 // reminders (שרת-פוש חיצוני אינו נדרש: התראות מקומיות בכל מכשיר שבו האפליקציה מותקנת)
-function beep(){try{const c=new (window.AudioContext||window.webkitAudioContext)();[880,1175,1568].forEach((f,i)=>{const o=c.createOscillator(),g=c.createGain();o.frequency.value=f;o.type='sine';o.connect(g);g.connect(c.destination);const t=c.currentTime+i*.18;g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.35,t+.02);g.gain.exponentialRampToValueAtTime(.0001,t+.17);o.start(t);o.stop(t+.18)})}catch{}}
+// צלילי התראה לבחירה (מושמעים כשהאפליקציה פתוחה; כשהיא סגורה הצליל נקבע בהגדרות הטלפון)
+const TONES={classic:['צלצול קלאסי',[[880,0],[1175,.18],[1568,.36]],'sine'],bell:['פעמון',[[1318,0],[1046,.35],[1318,.7]],'triangle'],digital:['דיגיטלי',[[1000,0],[1000,.15],[1000,.3],[1500,.45]],'square'],soft:['עדין',[[523,0],[659,.3],[784,.6]],'sine'],alarm:['אזעקה',[[900,0],[600,.2],[900,.4],[600,.6],[900,.8]],'sawtooth'],silent:['שקט (בלי צליל)',[],'sine']};
+let tone=localStorage.getItem('bny-tone')||'classic';
+function playTone(name){try{const t=TONES[name]||TONES.classic;if(!t[1].length)return;const c=new (window.AudioContext||window.webkitAudioContext)();
+  t[1].forEach(([f,at])=>{const o=c.createOscillator(),g=c.createGain();o.frequency.value=f;o.type=t[2];o.connect(g);g.connect(c.destination);const s=c.currentTime+at;g.gain.setValueAtTime(.0001,s);g.gain.exponentialRampToValueAtTime(.3,s+.02);g.gain.exponentialRampToValueAtTime(.0001,s+.28);o.start(s);o.stop(s+.3)})}catch{}}
+function beep(){playTone(tone)}
 async function notify(title,body){
   toast('🔔 '+title);
   if(!('Notification' in window)||Notification.permission!=='granted')return;
@@ -235,7 +240,8 @@ $('#loginFormMain').onsubmit=async e=>{e.preventDefault();const f=Object.fromEnt
 $('#mgrBtn').onclick=async()=>{if(await requestOtp())$('#loginOtp').hidden=false};
 $('#loginOtp').onsubmit=async e=>{e.preventDefault();const t=await verifyOtp(e.target.code.value);if(!t)return;
   adminTok=t.token;localStorage.setItem('bny-admin',adminTok);e.target.reset();e.target.hidden=true;renderAdmin();loggedIn(t.token,'מנהל')};
-$('#meBtn').onclick=()=>{sheet(myName||'משתמש','<button class="act" id="testPush">🔔 שלח לי התראת בדיקה</button><button class="act" id="logoutBtn">🚪 התנתק</button>');$('#testPush').onclick=testPush;$('#logoutBtn').onclick=()=>{$('#sheet').hidden=true;logout()}};
+$('#meBtn').onclick=()=>{sheet(myName||'משתמש',`<label class="lbl">🎵 צלצול התראה (כשהאפליקציה פתוחה)</label><div class="row" style="margin-bottom:10px"><select id="toneSel">${Object.entries(TONES).map(([k,v])=>`<option value="${k}" ${k===tone?'selected':''}>${v[0]}</option>`).join('')}</select><button class="btn" id="toneTry" style="flex:none">▶ השמע</button></div><p class="mut" style="margin-bottom:10px;font-size:12px">כשהאפליקציה סגורה, הצליל נקבע בהגדרות ההתראות של הטלפון.</p><button class="act" id="testPush">🔔 שלח לי התראת בדיקה</button><button class="act" id="logoutBtn">🚪 התנתק</button>`);
+  $('#testPush').onclick=testPush;$('#toneSel').onchange=e=>{tone=e.target.value;localStorage.setItem('bny-tone',tone);playTone(tone)};$('#toneTry').onclick=()=>playTone($('#toneSel').value);$('#logoutBtn').onclick=()=>{$('#sheet').hidden=true;logout()}};
 function renderAll(){renderToday();renderKids();renderAdmin();renderCal();renderContacts()}
 renderAll();renderMe();updNotifBtn();checkReminders();sync();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
@@ -275,3 +281,17 @@ $('#adminContacts').onclick=e=>{
 // כל מכשיר פתוח מעורר את בדיקת התזכורות בשרת (לכל היותר פעם בדקה) – גיבוי למתזמן החיצוני
 let lastCron=0;
 function pingCron(){if(Date.now()-lastCron<55000)return;lastCron=Date.now();fetch('/api/cron').catch(()=>{})}
+
+// פתיחה מהתראה: חלון נודניק (עובד גם באייפון, שאין בו כפתורי פעולה בהתראה)
+async function snoozeFor(r,min){
+  try{const sub=await (await navigator.serviceWorker.ready).pushManager.getSubscription();
+    if(!sub){toast('המכשיר לא רשום להתראות');return}
+    const x=await fetch('/api/snooze',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint,minutes:min,title:r.t,body:r.b,eid:r.e,at:r.a})});
+    toast(x.ok?`נודניק – תזכורת בעוד ${min} דק׳ ⏰`:'לא הצלחתי לקבוע נודניק');
+  }catch{toast('שגיאה')}$('#sheet').hidden=true}
+function showRemind(r){
+  sheet('⏰ '+(r.t||'תזכורת'),`<p class="mut" style="margin-bottom:12px">${esc(r.b||'')}</p>`+[10,30,60].map(m=>`<button class="act" data-sn="${m}">⏰ נודניק ${m===60?'שעה':m+' דקות'}</button>`).join(''));
+  $$('#sheetBody [data-sn]').forEach(b=>b.onclick=()=>snoozeFor(r,+b.dataset.sn));
+}
+if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',ev=>{const d=ev.data||{};if(d.type==='ring')beep();if(d.type==='remind')showRemind(d.r)});
+try{const q=new URLSearchParams(location.search).get('r');if(q){showRemind(JSON.parse(q));history.replaceState(null,'',location.pathname)}}catch{}

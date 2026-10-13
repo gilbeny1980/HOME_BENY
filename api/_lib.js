@@ -13,6 +13,7 @@ function init() {
     'CREATE TABLE IF NOT EXISTS otp_log (ts INTEGER)',
     'CREATE TABLE IF NOT EXISTS sess (h TEXT PRIMARY KEY, exp INTEGER, role TEXT, uname TEXT)',
     'CREATE TABLE IF NOT EXISTS login_log (ts INTEGER)',
+    'CREATE TABLE IF NOT EXISTS snoozes (id INTEGER PRIMARY KEY AUTOINCREMENT, endpoint TEXT, t INTEGER, title TEXT, body TEXT, eid TEXT, at INTEGER)',
   ]).then(() => client().execute('ALTER TABLE subs ADD COLUMN uname TEXT').catch(() => {})).catch(e => { ready = null; throw e; });
   return ready;
 }
@@ -23,6 +24,10 @@ const subPut = (sub, uname) => exec('INSERT INTO subs (endpoint, data, uname) VA
 const subsAll = async () => (await exec('SELECT data, uname FROM subs')).rows.map(r => ({ sub: JSON.parse(r.data), uname: r.uname || null }));
 const subGet = async endpoint => { const r = await exec('SELECT data FROM subs WHERE endpoint = ?', [endpoint]); return r.rows[0] ? JSON.parse(r.rows[0].data) : null; };
 const subCount = async () => Number((await exec('SELECT COUNT(*) AS n FROM subs')).rows[0].n);
+const snoozeAdd = (endpoint, t, title, body, eid, at) => exec('INSERT INTO snoozes (endpoint, t, title, body, eid, at) VALUES (?, ?, ?, ?, ?, ?)', [endpoint, t, title, body, eid || '', at || 0]);
+const snoozesDue = async now => (await exec('SELECT id, endpoint, title, body, eid, at FROM snoozes WHERE t <= ?', [now])).rows;
+const snoozeDel = id => exec('DELETE FROM snoozes WHERE id = ?', [id]);
+const wasFired = async k => (await exec('SELECT 1 AS x FROM fired WHERE k = ?', [k])).rows.length > 0;
 const subDel = endpoint => exec('DELETE FROM subs WHERE endpoint = ?', [endpoint]);
 // true only the first time a key is marked (prevents duplicate reminders)
 const markFired = async k => (await exec('INSERT OR IGNORE INTO fired (k) VALUES (?)', [k])).rowsAffected > 0;
@@ -82,4 +87,4 @@ async function setPassword(pw) {
   await exec("DELETE FROM sess WHERE role = 'user'"); // everyone must log in again with the new password
 }
 
-module.exports = { subGet, subCount, exec, sha, isAdmin, newSession, getSession, getUsers, checkPassword, setPassword, subPut, subsAll, subDel, markFired, getJSON, setJSON, merge, auth };
+module.exports = { snoozeAdd, snoozesDue, snoozeDel, wasFired, subGet, subCount, exec, sha, isAdmin, newSession, getSession, getUsers, checkPassword, setPassword, subPut, subsAll, subDel, markFired, getJSON, setJSON, merge, auth };
