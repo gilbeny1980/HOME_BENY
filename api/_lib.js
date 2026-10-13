@@ -13,14 +13,14 @@ function init() {
     'CREATE TABLE IF NOT EXISTS otp_log (ts INTEGER)',
     'CREATE TABLE IF NOT EXISTS sess (h TEXT PRIMARY KEY, exp INTEGER, role TEXT, uname TEXT)',
     'CREATE TABLE IF NOT EXISTS login_log (ts INTEGER)',
-  ]).catch(e => { ready = null; throw e; });
+  ]).then(() => client().execute('ALTER TABLE subs ADD COLUMN uname TEXT').catch(() => {})).catch(e => { ready = null; throw e; });
   return ready;
 }
 async function exec(sql, args = []) { await init(); return client().execute({ sql, args }); }
 const getJSON = async k => { const r = await exec('SELECT v FROM kv WHERE k = ?', [k]); return r.rows[0] ? JSON.parse(r.rows[0].v) : null; };
 const setJSON = (k, v) => exec('INSERT INTO kv (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v', [k, JSON.stringify(v)]);
-const subPut = sub => exec('INSERT INTO subs (endpoint, data) VALUES (?, ?) ON CONFLICT(endpoint) DO UPDATE SET data = excluded.data', [sub.endpoint, JSON.stringify(sub)]);
-const subsAll = async () => (await exec('SELECT data FROM subs')).rows.map(r => JSON.parse(r.data));
+const subPut = (sub, uname) => exec('INSERT INTO subs (endpoint, data, uname) VALUES (?, ?, ?) ON CONFLICT(endpoint) DO UPDATE SET data = excluded.data, uname = excluded.uname', [sub.endpoint, JSON.stringify(sub), uname || null]);
+const subsAll = async () => (await exec('SELECT data, uname FROM subs')).rows.map(r => ({ sub: JSON.parse(r.data), uname: r.uname || null }));
 const subGet = async endpoint => { const r = await exec('SELECT data FROM subs WHERE endpoint = ?', [endpoint]); return r.rows[0] ? JSON.parse(r.rows[0].data) : null; };
 const subCount = async () => Number((await exec('SELECT COUNT(*) AS n FROM subs')).rows[0].n);
 const subDel = endpoint => exec('DELETE FROM subs WHERE endpoint = ?', [endpoint]);
@@ -67,7 +67,7 @@ async function isAdmin(req) {
 }
 
 // ---- users & shared family password ----
-const DEFAULT_USERS = [{ u: 'gil', n: 'גיל' }, { u: 'adva', n: 'אדוה' }, { u: 'linoy', n: 'לינוי' }, { u: 'romi', n: 'רומי' }, { u: 'aline', n: 'אלין' }];
+const DEFAULT_USERS = [{ u: 'gil', n: 'גיל', p: true }, { u: 'adva', n: 'אדוה', p: true }, { u: 'linoy', n: 'לינוי' }, { u: 'romi', n: 'רומי' }, { u: 'aline', n: 'אלין' }];
 async function getUsers() { return (await getJSON('bny:users')) || DEFAULT_USERS; }
 const hashPw = (pw, salt) => crypto.scryptSync(String(pw), salt, 32).toString('hex');
 async function checkPassword(pw) {

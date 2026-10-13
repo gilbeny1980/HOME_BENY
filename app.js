@@ -8,6 +8,8 @@ let myName=localStorage.getItem('bny-name')||'';
 const KIDS=[['לינוי','#e0527a'],['רומי','#8e5bd6'],['אלין','#2f9e8f'],['גיל','#e8912d'],['אדוה','#3b82c4']];
 const kidColor=n=>(KIDS.find(k=>k[0]===n)||[])[1]||'#888';
 let kidFilter='';
+const evKids=e=>e.kids&&e.kids.length?e.kids:(e.kid?[e.kid]:[]);
+const kidTags=ks=>ks.map(k=>`<span class="tag" style="--c:${kidColor(k)}">${esc(k)}</span>`).join('');
 let adminTok=localStorage.getItem('bny-admin')||'';
 let syncT;
 db.events.forEach(e=>{if(!e.at)e.at=new Date(`${e.date}T${e.time}`).getTime()});
@@ -45,7 +47,8 @@ tick();setInterval(tick,1000);setInterval(()=>{renderToday();renderKids()},30000
 function renderKids(){
   const opts='<option value="">כולם</option>'+KIDS.map(k=>`<option>${k[0]}</option>`).join('');
   $('#kidChecks').innerHTML=KIDS.map(([n,c])=>`<label class="ck" style="--c:${c}"><input type="checkbox" name="kids" value="${n}"><span>${n}</span></label>`).join('');
-  $('#kidSel').innerHTML=opts;$('#whoSel').innerHTML=opts;
+  $('#evKids').innerHTML=KIDS.map(([n,c])=>`<label class="ck" style="--c:${c}"><input type="checkbox" name="ekids" value="${n}"><span>${n}</span></label>`).join('');
+  $('#whoSel').innerHTML=opts;
 }
 
 // sheet
@@ -72,13 +75,14 @@ function renderCal(){
   const y=view.getFullYear(),m=view.getMonth(),today=iso(new Date());
   $('#monthLabel').textContent=view.toLocaleDateString('he-IL',{month:'long',year:'numeric'});
   const start=new Date(y,m,1-new Date(y,m,1).getDay());
-  const evs=live(db.events).filter(e=>!kidFilter||!e.kid||e.kid===kidFilter);const dm={};evs.forEach(e=>{(dm[e.date]=dm[e.date]||new Set()).add(e.kid?kidColor(e.kid):'#ffc24a')});let h='';
+  const evs=live(db.events);let h='';
   for(let i=0;i<42;i++){const d=new Date(start);d.setDate(start.getDate()+i);const k=iso(d);
+    const dc=new Set();evs.forEach(e=>{if(REC.occursOn(e,k)){const ks=evKids(e);dc.add(ks.length?kidColor(ks[0]):'#ffc24a')}});const dm={[k]:dc.size?dc:null};
     h+=`<button class="day ${d.getMonth()!==m?'out':''} ${k===today?'today':''} ${k===sel?'sel':''} " data-d="${k}">${d.getDate()}${dm[k]?`<i class="dots">${[...dm[k]].slice(0,3).map(c=>`<s style="background:${c}"></s>`).join('')}</i>`:''}</button>`}
   $('#days').innerHTML=h;
   $('#selLabel').textContent=fmtDate(sel);
-  const ev=evs.filter(e=>e.date===sel).sort((a,b)=>a.time.localeCompare(b.time));
-  $('#eventList').innerHTML=ev.length?ev.map(e=>`<li class="item" style="--c:${e.kid?kidColor(e.kid):'var(--b1)'}"><div class="avatar">${esc(e.time)}</div><div class="main"><b>${esc(e.title)}${e.kid?`<span class="tag" style="--c:${kidColor(e.kid)}">${esc(e.kid)}</span>`:''}</b><small>${e.remind>=0?'🔔 '+$('#eventForm [name=remind] option[value="'+e.remind+'"]').textContent:'ללא תזכורת'}</small></div><button class="share" data-s="${e.id}" title="שלח תזכורת">📤</button><button class="del" data-id="${e.id}">🗑</button></li>`).join(''):'<li class="empty">אין אירועים ביום זה</li>';
+  const ev=evs.filter(e=>REC.occursOn(e,sel)).sort((a,b)=>a.time.localeCompare(b.time));
+  $('#eventList').innerHTML=ev.length?ev.map(e=>`<li class="item" style="--c:${evKids(e).length?kidColor(evKids(e)[0]):'var(--b1)'}"><div class="avatar">${esc(e.time)}</div><div class="main"><b>${esc(e.title)}${kidTags(evKids(e))}</b><small>${e.rep?'🔁 '+REC.LABEL[e.rep]+(e.until?' עד '+e.until:'')+' · ':''}${e.remind>=0?'🔔 '+$('#eventForm [name=remind] option[value="'+e.remind+'"]').textContent:'ללא תזכורת'}</small></div><button class="share" data-s="${e.id}" title="שלח תזכורת">📤</button><button class="del" data-id="${e.id}">🗑</button></li>`).join(''):'<li class="empty">אין אירועים ביום זה</li>';
   $('#eventForm [name=date]').value=sel;
   renderToday();renderKids();
 }
@@ -86,16 +90,16 @@ $('#days').onclick=e=>{const d=e.target.closest('.day');if(!d)return;sel=d.datas
 $('#prevM').onclick=()=>{view.setMonth(view.getMonth()-1);renderCal()};
 $('#nextM').onclick=()=>{view.setMonth(view.getMonth()+1);renderCal()};
 $('#goToday').onclick=()=>{sel=iso(new Date());view=new Date();view.setDate(1);renderCal()};
-$('#eventForm').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target);const tm=f.get('time')||'00:00';db.events.push(touch({id:uid(),title:f.get('title'),date:f.get('date'),time:tm,kid:f.get('kid')||'',at:new Date(`${f.get('date')}T${tm}`).getTime(),remind:+f.get('remind')}));sel=f.get('date');save();e.target.title.value='';e.target.closest('details').open=false;renderCal();checkReminders();if(+f.get('remind')>=0&&Notification.permission==='default')askNotif()};
+$('#eventForm').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target);const tm=f.get('time')||'00:00';db.events.push(touch({id:uid(),title:f.get('title'),date:f.get('date'),time:tm,kids:f.getAll('ekids'),rep:f.get('rep')||'',until:f.get('rep')?(f.get('until')||''):'',at:new Date(`${f.get('date')}T${tm}`).getTime(),remind:+f.get('remind')}));sel=f.get('date');save();e.target.title.value='';$$('#evKids input').forEach(i=>i.checked=false);e.target.rep.value='';$('#untilWrap').hidden=true;e.target.closest('details').open=false;renderCal();checkReminders();if(+f.get('remind')>=0&&Notification.permission==='default')askNotif()};
 function shareEvent(ev){
-  const txt=`תזכורת: ${ev.title}${ev.kid?' ('+ev.kid+')':''} – ${fmtDate(ev.date)} בשעה ${ev.time}`;
-  const cs=live(db.contacts).filter(c=>(c.phone||c.email)&&(!ev.kid||!(c.kids||[]).length||c.kids.includes(ev.kid)));
+  const ek=evKids(ev);const txt=`תזכורת: ${ev.title}${ek.length?' ('+ek.join(', ')+')':''} – ${fmtDate(ev.date)} בשעה ${ev.time}`;
+  const cs=live(db.contacts).filter(c=>(c.phone||c.email)&&(!ek.length||!(c.kids||[]).length||ek.some(k=>(c.kids||[]).includes(k))));
   let h=`<p class="mut">${esc(txt)}</p>`;
   h+=cs.map(c=>`<div class="act"><b style="flex:1">${esc(c.name)}</b>${c.phone?`<a href="https://wa.me/${intl(c.phone)}?text=${encodeURIComponent(txt)}" target="_blank">🟢</a><a href="sms:${esc(c.phone)}?&body=${encodeURIComponent(txt)}">💬</a>`:''}${c.email?`<a href="mailto:${esc(c.email)}?subject=${encodeURIComponent('תזכורת: '+ev.title)}&body=${encodeURIComponent(txt)}">✉️</a>`:''}</div>`).join('')||'<p class="empty">אין אנשי קשר מתאימים</p>';
   h+=`<a class="act" href="https://wa.me/?text=${encodeURIComponent(txt)}" target="_blank">🟢 וואטסאפ – בחירת נמען / קבוצה</a>`;
   sheet('שליחת תזכורת',h);
 }
-$('#eventList').onclick=e=>{const s=e.target.closest('.share');if(s)return shareEvent(db.events.find(x=>x.id===s.dataset.s));const b=e.target.closest('.del');if(b&&confirm('למחוק?')){const x=db.events.find(x=>x.id===b.dataset.id);x.del=1;touch(x);save();renderCal()}};
+$('#eventList').onclick=e=>{const s=e.target.closest('.share');if(s)return shareEvent(db.events.find(x=>x.id===s.dataset.s));const b=e.target.closest('.del');if(b&&confirm((db.events.find(x=>x.id===b.dataset.id)||{}).rep?'למחוק את כל האירועים החוזרים של האירוע הזה?':'למחוק?')){const x=db.events.find(x=>x.id===b.dataset.id);x.del=1;touch(x);save();renderCal()}};
 
 // reminders (שרת-פוש חיצוני אינו נדרש: התראות מקומיות בכל מכשיר שבו האפליקציה מותקנת)
 function beep(){try{const c=new (window.AudioContext||window.webkitAudioContext)();[880,1175,1568].forEach((f,i)=>{const o=c.createOscillator(),g=c.createGain();o.frequency.value=f;o.type='sine';o.connect(g);g.connect(c.destination);const t=c.currentTime+i*.18;g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.35,t+.02);g.gain.exponentialRampToValueAtTime(.0001,t+.17);o.start(t);o.stop(t+.18)})}catch{}}
@@ -107,10 +111,12 @@ async function notify(title,body){
 function checkReminders(){
   const now=Date.now();let ch=false;
   if(pushOn)return;
-  for(const e of live(db.events)){if(e.remind<0)continue;
-    const at=new Date(`${e.date}T${e.time}`).getTime(),fire=at-e.remind*60000;
-    if(now>=fire&&now<at+3600000&&!db.fired[e.id]){db.fired[e.id]=1;ch=true;
-      notify('תזכורת: '+e.title,`${fmtDate(e.date)} בשעה ${e.time}`)}}
+  const dd=n=>iso(new Date(now+n*864e5));
+  for(const e of live(db.events)){if(!(e.remind>=0))continue;
+    for(const d of [dd(-1),dd(0),dd(1)]){if(!REC.occursOn(e,d))continue;
+      const at=new Date(`${d}T${e.time}`).getTime(),fire=at-e.remind*60000,key=e.id+':'+at;
+      if(now>=fire&&now<at+3600000&&!db.fired[key]){db.fired[key]=1;ch=true;
+        const ks=evKids(e);notify('תזכורת: '+e.title+(ks.length?' ('+ks.join(', ')+')':''),`${fmtDate(d)} בשעה ${e.time}`)}}}
   const today=iso(new Date());
   if(!db.fired['d'+today]&&new Date().getHours()>=8){const n=!adminTok?0:live(db.tasks).filter(t=>!t.done&&t.due&&t.due<=today).length;
     if(n){db.fired['d'+today]=1;ch=true;notify('משימות להיום',`יש ${n} משימות פתוחות להיום או באיחור`)}}
@@ -142,12 +148,12 @@ async function sync(){
   syncing=true;
   try{
     const {tasks,events,contacts,notes}=db;
-    const body=adminTok?{tasks,events,contacts,notes}:{events,contacts,notes};
+    const body=adminTok?{tasks,events,contacts,notes}:{events};const cmp=adminTok?body:{events,contacts,notes};
     const r=await fetch('/api/data',{method:'POST',headers:hdr(),body:JSON.stringify(body)});
     if(r.status===401){logout(true);return}
     if(!r.ok)return;
     const m=await r.json();
-    if(JSON.stringify(body)!==JSON.stringify(m)){Object.assign(db,m);localStorage.setItem(KEY,JSON.stringify(db));renderAll()}
+    if(JSON.stringify(cmp)!==JSON.stringify(m)){Object.assign(db,m);localStorage.setItem(KEY,JSON.stringify(db));renderAll()}
     enablePush();
   }catch(e){}finally{syncing=false}
 }
@@ -161,7 +167,8 @@ setInterval(checkReminders,30000);document.addEventListener('visibilitychange',c
 function renderContacts(){
   const q=$('#search').value.trim().toLowerCase();
   const l=live(db.contacts).filter(c=>(!kidFilter||(c.kids||[]).includes(kidFilter))&&(!q||(c.name+c.phone+c.address+(c.email||'')).toLowerCase().includes(q))).sort((a,b)=>a.name.localeCompare(b.name,'he'));
-  $('#contactList').innerHTML=l.length?l.map(c=>`<li class="item" data-id="${c.id}"><div class="avatar">${esc(c.name[0])}</div><div class="main"><b>${esc(c.name)}</b><small>${esc(c.phone)} ${c.note?'· '+esc(c.note):''}</small>${c.info?`<p class="info">📝 ${esc(c.info)}</p>`:''}<div>${(c.kids||[]).map(k=>`<span class="tag" style="--c:${kidColor(k)}">${esc(k)}</span>`).join('')}</div>${c.address?`<br><button class="addr" data-w="${c.id}">📍 ${esc(c.address)}</button>`:''}</div>${c.address?`<button class="wazeBtn" data-w="${c.id}" aria-label="Waze">🚗<span>Waze</span></button>`:''}<button class="del" data-x="${c.id}">🗑</button></li>`).join(''):'<li class="empty">אין אנשי קשר</li>';
+  renderAdminContacts();
+  $('#contactList').innerHTML=l.length?l.map(c=>`<li class="item" data-id="${c.id}"><div class="avatar">${esc(c.name[0])}</div><div class="main"><b>${esc(c.name)}</b><small>${esc(c.phone)} ${c.note?'· '+esc(c.note):''}</small>${c.info?`<p class="info">📝 ${esc(c.info)}</p>`:''}<div>${(c.kids||[]).map(k=>`<span class="tag" style="--c:${kidColor(k)}">${esc(k)}</span>`).join('')}</div>${c.address?`<br><button class="addr" data-w="${c.id}">📍 ${esc(c.address)}</button>`:''}</div>${c.address?`<button class="wazeBtn" data-w="${c.id}" aria-label="Waze">🚗<span>Waze</span></button>`:''}</li>`).join(''):'<li class="empty">אין אנשי קשר</li>';
 }
 $('#search').oninput=renderContacts;
 let editId='';
@@ -185,13 +192,13 @@ $('#contactList').onclick=e=>{
   if(c.info)h+=`<div class="act info2">📝 <span>${esc(c.info)}</span></div>`;
   if(c.phone)h+=`<a class="act" href="tel:${esc(c.phone)}">📞 התקשר ${esc(c.phone)}</a><a class="act" href="sms:${esc(c.phone)}">💬 שלח SMS</a><a class="act" href="https://wa.me/${intl(c.phone)}" target="_blank">🟢 וואטסאפ</a>`;
   if(c.email)h+=`<a class="act" href="mailto:${esc(c.email)}">✉️ שלח מייל ${esc(c.email)}</a>`;
-  h+=`<button class="act" data-edit="${c.id}">✏️ ערוך איש קשר</button>`;
+  if(adminTok)h+=`<button class="act" data-edit="${c.id}">✏️ ערוך איש קשר</button>`;
   sheet(c.name,h);
-  $('#sheetBody [data-edit]').onclick=()=>{$('#sheet').hidden=true;editContact(c)};
+  const eb=$('#sheetBody [data-edit]');if(eb)eb.onclick=()=>{$('#sheet').hidden=true;editContact(c)};
 };
 
 
-function renderAdmin(){const on=!!adminTok;$('#adminGate').hidden=on;if(on)$('#otpForm').hidden=true;$('#adminBody').hidden=!on;if(on){renderTasks();loadUsers()}}
+function renderAdmin(){const on=!!adminTok;$('#adminGate').hidden=on;if(on)$('#otpForm').hidden=true;$('#adminBody').hidden=!on;renderContacts();if(on){renderTasks();loadUsers()}}
 async function requestOtp(){
   try{const r=await fetch('/api/otp',{method:'POST',headers:hdr(),body:JSON.stringify({action:'request'})});
     if(r.status===429){toast('יותר מדי בקשות, נסה בעוד כמה דקות');return false}
@@ -210,9 +217,9 @@ async function usersCall(body){
   const r=await fetch('/api/users',{method:body?'POST':'GET',headers:hdr(),body:body?JSON.stringify(body):undefined});
   if(!r.ok){toast(r.status===401?'אין הרשאת מנהל':'שגיאה');return null}return r.json()}
 async function loadUsers(){const d=await usersCall();if(d)renderUsers(d.users)}
-function renderUsers(us){$('#userList').innerHTML=us.map(u=>`<li class="item"><div class="avatar">${esc(u.n[0])}</div><div class="main"><b>${esc(u.n)}</b><small dir="ltr">${esc(u.u)}</small></div><button class="del" data-u="${esc(u.u)}">🗑</button></li>`).join('')}
+function renderUsers(us){$('#userList').innerHTML=us.map(u=>`<li class="item"><div class="avatar">${esc(u.n[0])}</div><div class="main"><b>${esc(u.n)}</b><small dir="ltr">${esc(u.u)}${u.p?' · הורה':''}</small></div><button class="del" data-u="${esc(u.u)}">🗑</button></li>`).join('')}
 $('#userList').onclick=async e=>{const b=e.target.closest('[data-u]');if(!b||!confirm('להסיר את המשתמש?'))return;const d=await usersCall({action:'remove',u:b.dataset.u});if(d)renderUsers(d.users)};
-$('#userForm').onsubmit=async e=>{e.preventDefault();const f=Object.fromEntries(new FormData(e.target));const d=await usersCall({action:'save',...f});if(d){renderUsers(d.users);e.target.reset();toast('נשמר')}};
+$('#userForm').onsubmit=async e=>{e.preventDefault();const f=Object.fromEntries(new FormData(e.target));f.p=!!f.p;const d=await usersCall({action:'save',...f});if(d){renderUsers(d.users);e.target.reset();toast('נשמר')}};
 $('#pwForm').onsubmit=async e=>{e.preventDefault();const d=await usersCall({action:'password',password:e.target.pw.value});if(d){e.target.reset();toast('הסיסמה שונתה – כולם יתחברו מחדש')}};
 // login screen
 function showLogin(){$('#login').hidden=false;$('#meBtn').hidden=true}
@@ -253,3 +260,13 @@ async function testPush(){
     if(r.ok)toast('נשלחה התראת בדיקה – אמורה להופיע תוך שניות');else toast('השרת לא הצליח לשלוח: '+(d.error||r.status));
   }catch(e){toast('שגיאה: '+(e.message||e))}
 }
+
+$('#repSel').onchange=e=>{$('#untilWrap').hidden=!e.target.value};
+
+function renderAdminContacts(){
+  const l=live(db.contacts).sort((x,y)=>x.name.localeCompare(y.name,'he'));
+  $('#adminContacts').innerHTML=l.length?l.map(c=>`<li class="item"><div class="avatar">${esc(c.name[0])}</div><div class="main"><b>${esc(c.name)}</b><small>${esc(c.phone||'')}</small></div><button class="share" data-edit="${c.id}" title="עריכה">✏️</button><button class="del" data-del="${c.id}">🗑</button></li>`).join(''):'<li class="empty">אין אנשי קשר</li>';
+}
+$('#adminContacts').onclick=e=>{
+  const ed=e.target.closest('[data-edit]');if(ed)return editContact(db.contacts.find(c=>c.id===ed.dataset.edit));
+  const dl=e.target.closest('[data-del]');if(dl&&confirm('למחוק את איש הקשר?')){const c=db.contacts.find(c=>c.id===dl.dataset.del);c.del=1;touch(c);save();renderContacts()}};

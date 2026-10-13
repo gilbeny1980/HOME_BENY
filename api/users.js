@@ -14,7 +14,7 @@ module.exports = async (req, res) => {
         const u = String(b.u || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
         const n = String(b.n || '').trim();
         if (!u || !n) return res.status(400).json({ error: 'missing fields' });
-        users = users.filter(x => x.u !== u).concat([{ u, n }]);
+        users = users.filter(x => x.u !== u).concat([b.p ? { u, n, p: true } : { u, n }]);
         await setJSON('bny:users', users);
       } else if (b.action === 'remove') {
         users = users.filter(x => x.u !== b.u);

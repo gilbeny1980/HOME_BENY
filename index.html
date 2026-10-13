@@ -58,9 +58,15 @@
           <input name="date" type="date" required>
           <input name="time" type="time" value="18:00">
         </div>
-        <label class="lbl">עבור
-          <select name="kid" id="kidSel"></select>
+        <div class="lbl">עבור (אפשר כמה · ריק = כולם)</div>
+        <div id="evKids" class="checks"></div>
+        <label class="lbl">חזרה
+          <select name="rep" id="repSel">
+            <option value="">ללא חזרה</option><option value="d">כל יום</option><option value="w">כל שבוע</option>
+            <option value="2w">כל שבועיים</option><option value="m">כל חודש</option><option value="y">כל שנה</option>
+          </select>
         </label>
+        <label class="lbl" id="untilWrap" hidden>חוזר עד תאריך (לא חובה)<input name="until" type="date"></label>
         <label class="lbl">תזכורת
           <select name="remind">
             <option value="-1">ללא</option><option value="0">בזמן האירוע</option>
@@ -75,7 +81,6 @@
 
   <!-- אנשי קשר -->
   <section id="tab-contacts" class="tab">
-    <button id="addContactBtn" class="btn gold" type="button" style="width:100%;margin-bottom:12px">＋ איש קשר חדש</button>
     <input id="search" class="search" placeholder="🔍 חיפוש איש קשר…">
     <ul id="contactList" class="list"></ul>
   </section>
@@ -101,8 +106,15 @@
         <ul id="userList" class="list"></ul>
         <form id="userForm" class="form">
           <div class="row"><input name="u" placeholder="שם משתמש (באנגלית)" dir="ltr" required><input name="n" placeholder="שם להצגה" required></div>
+          <label class="ck"><input type="checkbox" name="p" value="1"><span style="--c:#6d4aff;border-color:#6d4aff">הורה (מקבל גם תזכורות של הילדים)</span></label>
           <button class="btn">＋ הוסף / עדכן משתמש</button>
         </form>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0">📇 אנשי קשר</h3>
+        <p class="mut">הוספה, עריכה ומחיקה של אנשי קשר – רק כאן.</p>
+        <button id="addContactBtn" class="btn gold" type="button">＋ איש קשר חדש</button>
+        <ul id="adminContacts" class="list" style="margin-top:12px"></ul>
       </div>
       <form id="pwForm" class="card form">
         <h3>🔑 שינוי סיסמת כניסה לאתר</h3>
@@ -172,6 +184,7 @@
   <div class="sheetBox"><h3 id="sheetTitle"></h3><div id="sheetBody"></div><button class="btn ghost" id="sheetClose">סגור</button></div>
 </div>
 <div id="toast" class="toast" hidden></div>
+<script src="rec.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

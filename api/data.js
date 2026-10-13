@@ -7,7 +7,7 @@ module.exports = async (req, res) => {
     let out = merge(cur, {});
     if (req.method === 'POST') {
       const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
-      if (!admin) delete body.tasks; // משימות נכתבות רק ממצב ניהול
+      if (!admin) { delete body.tasks; delete body.contacts; } // משימות ואנשי קשר נכתבים רק ממצב ניהול
       out = merge(cur, body);
       await setJSON('bny:data', out);
     }
