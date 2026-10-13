@@ -87,6 +87,11 @@
         </form>
       </div>
       <div class="card">
+        <h3 style="margin-top:0">📅 אירועים</h3>
+        <p class="mut">עריכה ומחיקה של אירועים.</p>
+        <ul id="adminEvents" class="list"></ul>
+      </div>
+      <div class="card">
         <h3 style="margin-top:0">📇 אנשי קשר</h3>
         <p class="mut">הוספה, עריכה ומחיקה של אנשי קשר – רק כאן.</p>
         <button id="addContactBtn" class="btn gold" type="button">＋ איש קשר חדש</button>
@@ -172,7 +177,7 @@
       <label class="lbl">חזור להתריע עד שתאשר (עד 5 פעמים)
         <select name="nag"><option value="0">לא</option><option value="5" selected>כל 5 דקות</option><option value="10">כל 10 דקות</option><option value="15">כל 15 דקות</option><option value="30">כל 30 דקות</option></select>
       </label>
-      <button class="btn">＋ הוסף ללוח</button>
+      <button class="btn" id="eventSave">＋ הוסף ללוח</button>
       <button type="button" class="btn ghost" id="eventCancel">ביטול</button>
     </form>
   </div>

@@ -73,7 +73,7 @@ async function isAdmin(req) {
 }
 
 // ---- users & shared family password ----
-const DEFAULT_USERS = [{ u: 'gil', n: 'גיל', p: true }, { u: 'adva', n: 'אדוה', p: true }, { u: 'linoy', n: 'לינוי' }, { u: 'romi', n: 'רומי' }, { u: 'aline', n: 'אלין' }];
+const DEFAULT_USERS = [{ u: 'gil', n: 'גיל', p: true, c: '#e8912d' }, { u: 'adva', n: 'אדוה', p: true, c: '#3b82c4' }, { u: 'linoy', n: 'לינוי', c: '#e0527a' }, { u: 'romi', n: 'רומי', c: '#8e5bd6' }, { u: 'aline', n: 'אלין', c: '#2f9e8f' }];
 async function getUsers() { return (await getJSON('bny:users')) || DEFAULT_USERS; }
 const hashPw = (pw, salt) => crypto.scryptSync(String(pw), salt, 32).toString('hex');
 async function checkPassword(pw) {

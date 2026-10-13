@@ -5,8 +5,18 @@ let db={tasks:[],events:[],contacts:[],notes:[],fired:{}};
 try{db=Object.assign(db,JSON.parse(localStorage.getItem(KEY)||'{}'))}catch{}
 let token=localStorage.getItem('bny-token')||'';
 let myName=localStorage.getItem('bny-name')||'';
-const KIDS=[['לינוי','#e0527a'],['רומי','#8e5bd6'],['אלין','#2f9e8f'],['גיל','#e8912d'],['אדוה','#3b82c4']];
+const PALETTE=['#e0527a','#8e5bd6','#2f9e8f','#e8912d','#3b82c4','#c2410c','#0f766e','#a21caf'];
+let KIDS=(()=>{try{const f=JSON.parse(localStorage.getItem('bny-fam')||'null');if(f&&f.length)return f}catch{}return [['לינוי','#e0527a'],['רומי','#8e5bd6'],['אלין','#2f9e8f'],['גיל','#e8912d'],['אדוה','#3b82c4']]})();
 const kidColor=n=>(KIDS.find(k=>k[0]===n)||[])[1]||'#888';
+const kidBg=ks=>!ks.length?'var(--g)':ks.length===1?kidColor(ks[0]):`linear-gradient(135deg,${ks.map(kidColor).join(',')})`;
+function setFamily(users){
+  const sorted=[...users].sort((x,y)=>(x.p?1:0)-(y.p?1:0));
+  KIDS=sorted.map((u,i)=>[u.n,u.c||PALETTE[i%PALETTE.length]]);
+  localStorage.setItem('bny-fam',JSON.stringify(KIDS));
+  kidsBuilt=false;renderKids();renderCal();renderContacts();
+}
+let famTick=0;
+async function loadFamily(){try{const r=await fetch('/api/users',{headers:hdr()});if(r.ok)setFamily((await r.json()).users)}catch{}}
 let kidFilter='';
 const evKids=e=>e.kids&&e.kids.length?e.kids:(e.kid?[e.kid]:[]);
 const kidTags=ks=>ks.map(k=>`<span class="tag" style="--c:${kidColor(k)}">${esc(k)}</span>`).join('');
@@ -80,27 +90,32 @@ function renderCal(){
   const start=new Date(y,m,1-new Date(y,m,1).getDay());
   const evs=live(db.events);let h='';
   for(let i=0;i<42;i++){const d=new Date(start);d.setDate(start.getDate()+i);const k=iso(d);
-    const items=evs.filter(e=>REC.occursOn(e,k)).sort((p,q)=>p.time.localeCompare(q.time)).map(e=>({t:e.title,c:evKids(e).length?kidColor(evKids(e)[0]):'#ffc24a'}));
-    if(adminTok)live(db.tasks).filter(t=>t.due===k&&!t.done).forEach(t=>items.push({t:'☐ '+t.title,c:'#8a8aa5'}));
-    const shown=items.slice(0,3).map(x=>`<i style="--c:${x.c}">${esc(x.t)}</i>`).join('')+(items.length>3?`<i class="more">+${items.length-3}</i>`:'');
+    const items=evs.filter(e=>REC.occursOn(e,k)).sort((p,q)=>p.time.localeCompare(q.time)).map(e=>({t:e.title,bg:evKids(e).length?kidBg(evKids(e)):'#f0a92b'}));
+    if(adminTok)live(db.tasks).filter(t=>t.due===k&&!t.done).forEach(t=>items.push({t:'☐ '+t.title,bg:'#8a8aa5'}));
+    const shown=items.slice(0,3).map(x=>`<i style="background:${x.bg}">${esc(x.t)}</i>`).join('')+(items.length>3?`<i class="more">+${items.length-3}</i>`:'');
     h+=`<button class="day ${d.getMonth()!==m?'out':''} ${k===today?'today':''} ${k===sel?'sel':''}" data-d="${k}"><span class="dn">${d.getDate()}</span><span class="dt">${shown}</span></button>`}
   $('#days').innerHTML=h;
   $('#selLabel').textContent=fmtDate(sel);
   const ev=evs.filter(e=>REC.occursOn(e,sel)).sort((a,b)=>a.time.localeCompare(b.time));
-  $('#eventList').innerHTML=ev.length?ev.map(e=>`<li class="item" style="--c:${evKids(e).length?kidColor(evKids(e)[0]):'var(--b1)'}"><div class="avatar">${esc(e.time)}</div><div class="main"><b>${esc(e.title)}${kidTags(evKids(e))}</b><small>${e.rep?'🔁 '+REC.LABEL[e.rep]+(e.until?' עד '+e.until:'')+' · ':''}${e.nag?'🔂 כל '+e.nag+' דק׳ · ':''}${e.remind>=0?'🔔 '+$('#eventForm [name=remind] option[value="'+e.remind+'"]').textContent:'ללא תזכורת'}</small></div>${e.img?`<img class="evImg" data-img="${e.img}" alt="תמונה">`:''}<button class="share" data-s="${e.id}" title="שלח תזכורת">📤</button><button class="del" data-id="${e.id}">🗑</button></li>`).join(''):'<li class="empty">אין אירועים ביום זה</li>';
+  $('#eventList').innerHTML=ev.length?ev.map(e=>`<li class="item" style="--c:${evKids(e).length?kidColor(evKids(e)[0]):'var(--b1)'}"><div class="avatar" style="background:${kidBg(evKids(e))}">${esc(e.time)}</div><div class="main"><b>${esc(e.title)}${kidTags(evKids(e))}</b><small>${e.rep?'🔁 '+REC.LABEL[e.rep]+(e.until?' עד '+e.until:'')+' · ':''}${e.nag?'🔂 כל '+e.nag+' דק׳ · ':''}${e.remind>=0?'🔔 '+$('#eventForm [name=remind] option[value="'+e.remind+'"]').textContent:'ללא תזכורת'}</small></div>${e.img?`<img class="evImg" data-img="${e.img}" alt="תמונה">`:''}${adminTok?`<button class="share" data-ed="${e.id}" title="עריכה">✏️</button>`:''}<button class="share" data-s="${e.id}" title="שלח תזכורת">📤</button><button class="del" data-id="${e.id}">🗑</button></li>`).join(''):'<li class="empty">אין אירועים ביום זה</li>';
   const tk=adminTok?live(db.tasks).filter(t=>t.due===sel):[];
   $('#dayTasksH').hidden=!tk.length;
   $('#dayTasks').innerHTML=tk.map(t=>`<li class="item ${t.done?'done':''}" style="--c:${t.who?kidColor(t.who):'var(--b1)'}"><div class="avatar">${t.done?'✓':'☐'}</div><div class="main"><b>${esc(t.title)}${t.who?`<span class="tag" style="--c:${kidColor(t.who)}">${esc(t.who)}</span>`:''}</b></div></li>`).join('');
   if($('#eventModal').hidden)$('#eventForm [name=date]').value=sel;
-  hydrateImgs();renderToday();renderKids();
+  renderAdminEvents();hydrateImgs();renderToday();renderKids();
 }
 $('#days').onclick=e=>{const d=e.target.closest('.day');if(!d)return;sel=d.dataset.d;$('#eventForm [name=date]').value=sel;const s=new Date(sel+'T00:00');view=new Date(s.getFullYear(),s.getMonth(),1);renderCal()};
 $('#prevM').onclick=()=>{view.setMonth(view.getMonth()-1);renderCal()};
 $('#nextM').onclick=()=>{view.setMonth(view.getMonth()+1);renderCal()};
 $('#goToday').onclick=()=>{sel=iso(new Date());view=new Date();view.setDate(1);renderCal()};
-$('#eventForm').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);let imgId='';
-  if(pendingImg){try{const r=await fetch('/api/image',{method:'POST',headers:hdr(),body:JSON.stringify({data:pendingImg})});if(r.ok)imgId=(await r.json()).id;else toast('העלאת התמונה נכשלה – האירוע נשמר בלי תמונה')}catch{toast('העלאת התמונה נכשלה – האירוע נשמר בלי תמונה')}}
-  const tm=f.get('time')||'00:00';db.events.push(touch({id:uid(),title:f.get('title'),date:f.get('date'),time:tm,kids:f.getAll('ekids'),img:imgId,rep:f.get('rep')||'',nag:+f.get('nag')||0,until:f.get('rep')?(f.get('until')||''):'',at:new Date(`${f.get('date')}T${tm}`).getTime(),remind:+f.get('remind')}));sel=f.get('date');save();e.target.title.value='';$$('#evKids input').forEach(i=>i.checked=false);e.target.rep.value='';e.target.nag.value='5';clearImg();$('#untilWrap').hidden=true;$('#eventModal').hidden=true;renderCal();checkReminders();if(+f.get('remind')>=0&&Notification.permission==='default')askNotif()};
+$('#eventForm').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);let imgId=curImg;
+  if(pendingImg){try{const r=await fetch('/api/image',{method:'POST',headers:hdr(),body:JSON.stringify({data:pendingImg})});if(r.ok)imgId=(await r.json()).id;else toast('העלאת התמונה נכשלה')}catch{toast('העלאת התמונה נכשלה')}}
+  if(origImg&&imgId!==origImg)fetch('/api/image?id='+origImg,{method:'DELETE',headers:hdr()}).catch(()=>{});
+  const tm=f.get('time')||'00:00',rep=f.get('rep')||'';
+  const data={title:f.get('title'),date:f.get('date'),time:tm,kids:f.getAll('ekids'),img:imgId,rep,nag:+f.get('nag')||0,until:rep?(f.get('until')||''):'',at:new Date(`${f.get('date')}T${tm}`).getTime(),remind:+f.get('remind')};
+  if(editEv){const x=db.events.find(v=>v.id===editEv);if(x){Object.assign(x,data);delete x.kid;touch(x)}}else db.events.push(touch({id:uid(),...data}));
+  sel=f.get('date');save();editEv='';clearImg();$('#eventModal').hidden=true;renderCal();checkReminders();
+  if(+f.get('remind')>=0&&Notification.permission==='default')askNotif()};
 function shareEvent(ev){
   const ek=evKids(ev);const txt=`תזכורת: ${ev.title}${ek.length?' ('+ek.join(', ')+')':''} – ${fmtDate(ev.date)} בשעה ${ev.time}`;
   const cs=live(db.contacts).filter(c=>(c.phone||c.email)&&(!ek.length||!(c.kids||[]).length||ek.some(k=>(c.kids||[]).includes(k))));
@@ -109,7 +124,7 @@ function shareEvent(ev){
   h+=`<a class="act" href="https://wa.me/?text=${encodeURIComponent(txt)}" target="_blank">🟢 וואטסאפ – בחירת נמען / קבוצה</a>`;
   sheet('שליחת תזכורת',h);
 }
-$('#eventList').onclick=e=>{const im=e.target.closest('.evImg');if(im)return showImage(im.dataset.img);const s=e.target.closest('.share');if(s)return shareEvent(db.events.find(x=>x.id===s.dataset.s));const b=e.target.closest('.del');if(b&&confirm((db.events.find(x=>x.id===b.dataset.id)||{}).rep?'למחוק את כל האירועים החוזרים של האירוע הזה?':'למחוק?')){const x=db.events.find(x=>x.id===b.dataset.id);x.del=1;touch(x);if(x.img)fetch('/api/image?id='+x.img,{method:'DELETE',headers:hdr()}).catch(()=>{});save();renderCal()}};
+$('#eventList').onclick=e=>{const im=e.target.closest('.evImg');if(im)return showImage(im.dataset.img);const ed=e.target.closest('[data-ed]');if(ed)return openEventForm(db.events.find(x=>x.id===ed.dataset.ed));const s=e.target.closest('.share');if(s)return shareEvent(db.events.find(x=>x.id===s.dataset.s));const b=e.target.closest('.del');if(b&&confirm((db.events.find(x=>x.id===b.dataset.id)||{}).rep?'למחוק את כל האירועים החוזרים של האירוע הזה?':'למחוק?')){const x=db.events.find(x=>x.id===b.dataset.id);x.del=1;touch(x);if(x.img)fetch('/api/image?id='+x.img,{method:'DELETE',headers:hdr()}).catch(()=>{});save();renderCal()}};
 
 // reminders (שרת-פוש חיצוני אינו נדרש: התראות מקומיות בכל מכשיר שבו האפליקציה מותקנת)
 // צלילי התראה לבחירה (מושמעים כשהאפליקציה פתוחה; כשהיא סגורה הצליל נקבע בהגדרות הטלפון)
@@ -191,6 +206,7 @@ async function sync(){
     if(JSON.stringify(cmp)!==JSON.stringify(m)){Object.assign(db,m);localStorage.setItem(KEY,JSON.stringify(db));renderAll()}
     enablePush();
     pingCron();
+    if(famTick++%10===0)loadFamily();
   }catch(e){}finally{syncing=false}
 }
 setInterval(()=>{if(!document.hidden)sync()},30000);
@@ -253,7 +269,7 @@ async function usersCall(body){
   const r=await fetch('/api/users',{method:body?'POST':'GET',headers:hdr(),body:body?JSON.stringify(body):undefined});
   if(!r.ok){toast(r.status===401?'אין הרשאת מנהל':'שגיאה');return null}return r.json()}
 async function loadUsers(){const d=await usersCall();if(d)renderUsers(d.users)}
-function renderUsers(us){$('#userList').innerHTML=us.map(u=>`<li class="item"><div class="avatar">${esc(u.n[0])}</div><div class="main"><b>${esc(u.n)}</b><small dir="ltr">${esc(u.u)}${u.p?' · הורה':''}</small></div><button class="del" data-u="${esc(u.u)}">🗑</button></li>`).join('')}
+function renderUsers(us){$('#userList').innerHTML=us.map((u,i)=>`<li class="item" style="--c:${u.c||PALETTE[i%PALETTE.length]}"><input type="color" class="colorPick" data-uc="${esc(u.u)}" data-n="${esc(u.n)}" data-p="${u.p?1:''}" value="${u.c||PALETTE[i%PALETTE.length]}" aria-label="צבע"><div class="main"><b>${esc(u.n)}</b><small dir="ltr">${esc(u.u)}${u.p?' · הורה':''}</small></div><button class="del" data-u="${esc(u.u)}">🗑</button></li>`).join('')}
 $('#userList').onclick=async e=>{const b=e.target.closest('[data-u]');if(!b||!confirm('להסיר את המשתמש?'))return;const d=await usersCall({action:'remove',u:b.dataset.u});if(d)renderUsers(d.users)};
 $('#userForm').onsubmit=async e=>{e.preventDefault();const f=Object.fromEntries(new FormData(e.target));f.p=!!f.p;const d=await usersCall({action:'save',...f});if(d){renderUsers(d.users);e.target.reset();toast('נשמר')}};
 $('#pwForm').onsubmit=async e=>{e.preventDefault();const d=await usersCall({action:'password',password:e.target.pw.value});if(d){e.target.reset();toast('הסיסמה שונתה – כולם יתחברו מחדש')}};
@@ -328,14 +344,24 @@ try{const q=new URLSearchParams(location.search).get('r');if(q){showRemind(JSON.
   const H=$('#evH'),M=$('#evM'),T=$('#eventForm [name=time]');
   H.innerHTML=Array.from({length:24},(_,i)=>`<option>${pad(i)}</option>`).join('');
   M.innerHTML=Array.from({length:60},(_,i)=>`<option>${pad(i)}</option>`).join('');
-  const set=v=>{const [h,m]=v.split(':');H.value=h;M.value=m;T.value=v};
+  const set=v=>{const [h,m]=v.split(':');H.value=h;M.value=m;T.value=v};window.setEvTime=set;
   set(T.value);
   H.onchange=M.onchange=()=>{T.value=H.value+':'+M.value};
   const Q=['07:00','08:00','09:00','12:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00'];
   $('#timeChips').innerHTML=Q.map(q=>`<button type="button" class="qt" data-q="${q}">${q}</button>`).join('');
   $('#timeChips').onclick=e=>{const b=e.target.closest('[data-q]');if(b)set(b.dataset.q)};
 })();
-$('#addEventBtn').onclick=()=>{$('#eventForm [name=date]').value=sel;$('#eventModal').hidden=false;setTimeout(()=>$('#eventForm [name=title]').focus(),50)};
+function openEventForm(ev){
+  const f=$('#eventForm');editEv=ev?ev.id:'';clearImg();curImg=origImg=ev&&ev.img||'';
+  f.querySelector('h3').textContent=ev?'עריכת אירוע':'אירוע חדש';$('#eventSave').textContent=ev?'שמור שינויים':'＋ הוסף ללוח';
+  f.title.value=ev?ev.title:'';f.date.value=ev?ev.date:sel;setEvTime(ev?ev.time:'18:00');
+  $$('#evKids input').forEach(i=>i.checked=ev?evKids(ev).includes(i.value):false);
+  f.rep.value=ev?(ev.rep||''):'';$('#untilWrap').hidden=!(ev&&ev.rep);f.until.value=ev&&ev.until||'';
+  f.remind.value=ev?String(ev.remind):'60';f.nag.value=ev?String(ev.nag||0):'5';
+  if(curImg)getImg(curImg).then(d=>{if(d&&editEv===ev.id){$('#evImgThumb').src=d;$('#evImgPrev').hidden=false}});
+  $('#eventModal').hidden=false;if(!ev)setTimeout(()=>f.title.focus(),50);
+}
+$('#addEventBtn').onclick=()=>openEventForm(null);
 $('#eventCancel').onclick=()=>{$('#eventModal').hidden=true};
 $('#eventModal').onclick=e=>{if(e.target.id==='eventModal')$('#eventModal').hidden=true};
 
@@ -352,7 +378,7 @@ $('#alarmStop').onclick=()=>{stopRing();$('#alarm').hidden=true;if(alarmR&&alarm
 $('#alarmSnooze').onclick=async()=>{stopRing();$('#alarm').hidden=true;const r=alarmR||{};await snoozeFor(r,10);if(!r.e)setTimeout(()=>showAlarm(r),10*60000)};
 
 // תמונה לאירוע: מכווצים בדפדפן, מעלים לשרת, ומציגים לפי מזהה
-let pendingImg='';const imgCache=new Map();
+let pendingImg='',curImg='',origImg='',editEv='';const imgCache=new Map();
 function compress(file,max=1280,q=.72){return new Promise((res,rej)=>{const im=new Image(),u=URL.createObjectURL(file);
   im.onload=()=>{const s=Math.min(1,max/Math.max(im.width,im.height)),w=Math.round(im.width*s),h=Math.round(im.height*s),c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(im,0,0,w,h);URL.revokeObjectURL(u);res(c.toDataURL('image/jpeg',q))};
   im.onerror=()=>rej(new Error('bad image'));im.src=u})}
@@ -360,8 +386,24 @@ function clearImg(){pendingImg='';$('#evImgPrev').hidden=true;$('#evImgFile').va
 $('#evImgBtn').onclick=()=>$('#evImgFile').click();
 $('#evImgFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;
   try{pendingImg=await compress(f);$('#evImgThumb').src=pendingImg;$('#evImgPrev').hidden=false}catch{toast('לא הצלחתי לקרוא את התמונה');clearImg()}};
-$('#evImgDel').onclick=clearImg;
+$('#evImgDel').onclick=()=>{clearImg();curImg=''};
 async function getImg(id){if(imgCache.has(id))return imgCache.get(id);
   try{const r=await fetch('/api/image?id='+id,{headers:hdr()});if(!r.ok)return '';const d=(await r.json()).data;imgCache.set(id,d);return d}catch{return ''}}
 function hydrateImgs(){$$('img[data-img]').forEach(async im=>{if(im.src)return;const d=await getImg(im.dataset.img);if(d)im.src=d;else im.style.display='none'})}
 async function showImage(id){const d=await getImg(id);if(d)sheet('תמונה',`<img src="${d}" alt="" style="width:100%;border-radius:16px">`)}
+
+// ניהול אירועים (עריכה / מחיקה)
+function nextDate(e){const t=iso(new Date());if(!e.rep)return e.date;const far=iso(new Date(Date.now()+800*864e5));const ds=REC.occDates(e,far);return ds.find(d=>d>=t)||ds[ds.length-1]||e.date}
+function renderAdminEvents(){
+  if(!adminTok){$('#adminEvents').innerHTML='';return}
+  const t=iso(new Date());
+  const l=live(db.events).map(e=>({e,d:nextDate(e)})).sort((x,y)=>(x.d<t)-(y.d<t)||x.d.localeCompare(y.d)||x.e.time.localeCompare(y.e.time));
+  $('#adminEvents').innerHTML=l.length?l.map(({e,d})=>`<li class="item ${d<t?'done':''}" style="--c:${evKids(e).length?kidColor(evKids(e)[0]):'var(--b1)'}"><div class="avatar" style="background:${kidBg(evKids(e))}">${esc(e.time)}</div><div class="main"><b>${esc(e.title)}${kidTags(evKids(e))}</b><small>${fmtDate(d)}${e.rep?' · 🔁 '+REC.LABEL[e.rep]:''}</small></div><button class="share" data-ed="${e.id}" title="עריכה">✏️</button><button class="del" data-xd="${e.id}">🗑</button></li>`).join(''):'<li class="empty">אין אירועים</li>';
+}
+$('#adminEvents').onclick=e=>{
+  const ed=e.target.closest('[data-ed]');if(ed)return openEventForm(db.events.find(x=>x.id===ed.dataset.ed));
+  const xd=e.target.closest('[data-xd]');if(!xd)return;const ev=db.events.find(x=>x.id===xd.dataset.xd);
+  if(ev&&confirm(ev.rep?'למחוק את כל האירועים החוזרים?':'למחוק את האירוע?')){ev.del=1;touch(ev);if(ev.img)fetch('/api/image?id='+ev.img,{method:'DELETE',headers:hdr()}).catch(()=>{});save();renderCal()}};
+
+$('#userList').addEventListener('change',async e=>{const c=e.target.closest('[data-uc]');if(!c)return;
+  const d=await usersCall({action:'save',u:c.dataset.uc,n:c.dataset.n,p:!!c.dataset.p,c:c.value});if(d){renderUsers(d.users);setFamily(d.users);toast('הצבע נשמר')}});
