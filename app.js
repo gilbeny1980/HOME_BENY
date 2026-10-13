@@ -123,15 +123,17 @@ const TONES={
   silent:['שקט (בלי צליל)',[],'sine',[[1,1]],0]
 };
 let tone=localStorage.getItem('bny-tone');if(!TONES[tone])tone='chime';
+let AC;function ctx(){AC=AC||new (window.AudioContext||window.webkitAudioContext)();if(AC.state==='suspended')AC.resume();return AC}
+['pointerdown','touchstart','keydown'].forEach(ev=>addEventListener(ev,()=>{try{ctx()}catch{}},{once:true,passive:true}));
 function playTone(name){try{const t=TONES[name]||TONES.chime;if(!t[1].length)return;
-  const c=new (window.AudioContext||window.webkitAudioContext)();
+  const c=ctx();
   t[1].forEach(([f,at,dur])=>{for(const [mult,amp] of t[3]){const o=c.createOscillator(),g=c.createGain();o.type=t[2];o.frequency.value=f*mult;o.connect(g);g.connect(c.destination);
     const s=c.currentTime+at,v=t[4]*amp/(mult>1?1.2:1);g.gain.setValueAtTime(.0001,s);g.gain.exponentialRampToValueAtTime(v,s+.015);g.gain.exponentialRampToValueAtTime(.0001,s+dur);o.start(s);o.stop(s+dur+.05)}})}catch{}}
 function beep(){playTone(tone)}
 async function notify(title,body){
   toast('🔔 '+title);
   if(!('Notification' in window)||Notification.permission!=='granted')return;
-  beep();try{const r=await navigator.serviceWorker.ready;await r.showNotification(title,{body,icon:'icons/icon-192.png',dir:'rtl',lang:'he',tag:title+body,renotify:true,silent:false,requireInteraction:true,vibrate:[300,150,300,150,300]})}catch{new Notification(title,{body})}
+  showAlarm({t:title,b:body});try{const r=await navigator.serviceWorker.ready;await r.showNotification(title,{body,icon:'icons/icon-192.png',dir:'rtl',lang:'he',tag:title+body,renotify:true,silent:false,requireInteraction:true,vibrate:[300,150,300,150,300]})}catch{new Notification(title,{body})}
 }
 function checkReminders(){
   const now=Date.now();let ch=false;
@@ -260,8 +262,8 @@ $('#loginFormMain').onsubmit=async e=>{e.preventDefault();const f=Object.fromEnt
 $('#mgrBtn').onclick=async()=>{if(await requestOtp())$('#loginOtp').hidden=false};
 $('#loginOtp').onsubmit=async e=>{e.preventDefault();const t=await verifyOtp(e.target.code.value);if(!t)return;
   adminTok=t.token;localStorage.setItem('bny-admin',adminTok);e.target.reset();e.target.hidden=true;renderAdmin();loggedIn(t.token,'מנהל')};
-$('#meBtn').onclick=()=>{sheet(myName||'משתמש',`<label class="lbl">🎵 צלצול התראה (כשהאפליקציה פתוחה)</label><div class="row" style="margin-bottom:10px"><select id="toneSel">${Object.entries(TONES).map(([k,v])=>`<option value="${k}" ${k===tone?'selected':''}>${v[0]}</option>`).join('')}</select><button class="btn" id="toneTry" style="flex:none">▶ השמע</button></div><p class="mut" style="margin-bottom:10px;font-size:12px">כשהאפליקציה סגורה, הצליל נקבע בהגדרות ההתראות של הטלפון.</p><button class="act" id="testPush">🔔 שלח לי התראת בדיקה</button><button class="act" id="logoutBtn">🚪 התנתק</button>`);
-  $('#testPush').onclick=testPush;$('#toneSel').onchange=e=>{tone=e.target.value;localStorage.setItem('bny-tone',tone);playTone(tone)};$('#toneTry').onclick=()=>playTone($('#toneSel').value);$('#logoutBtn').onclick=()=>{$('#sheet').hidden=true;logout()}};
+$('#meBtn').onclick=()=>{sheet(myName||'משתמש',`<label class="lbl">🎵 צלצול התראה (כשהאפליקציה פתוחה)</label><div class="row" style="margin-bottom:10px"><select id="toneSel">${Object.entries(TONES).map(([k,v])=>`<option value="${k}" ${k===tone?'selected':''}>${v[0]}</option>`).join('')}</select><button class="btn" id="toneTry" style="flex:none">▶ השמע</button></div><label class="lbl" style="flex-direction:row;gap:8px;align-items:center;margin-bottom:10px;color:var(--text)"><input type="checkbox" id="loopChk" ${localStorage.getItem('bny-loop')!=='0'?'checked':''} style="width:auto"> צלצול מתמשך עד שלוחצים "הבנתי"</label><p class="mut" style="margin-bottom:10px;font-size:12px">כשהאפליקציה סגורה, הצליל נקבע בהגדרות ההתראות של הטלפון.</p><button class="act" id="testPush">🔔 שלח לי התראת בדיקה</button><button class="act" id="logoutBtn">🚪 התנתק</button>`);
+  $('#testPush').onclick=testPush;$('#loopChk').onchange=e=>localStorage.setItem('bny-loop',e.target.checked?'1':'0');$('#toneSel').onchange=e=>{tone=e.target.value;localStorage.setItem('bny-tone',tone);playTone(tone)};$('#toneTry').onclick=()=>playTone($('#toneSel').value);$('#logoutBtn').onclick=()=>{$('#sheet').hidden=true;logout()}};
 function renderAll(){renderToday();renderKids();renderAdmin();renderCal();renderContacts()}
 renderAll();renderMe();updNotifBtn();checkReminders();sync();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
@@ -309,11 +311,8 @@ async function snoozeFor(r,min){
     const x=await fetch('/api/snooze',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint,minutes:min,title:r.t,body:r.b,eid:r.e,at:r.a})});
     toast(x.ok?`נודניק – תזכורת בעוד ${min} דק׳ ⏰`:'לא הצלחתי לקבוע נודניק');
   }catch{toast('שגיאה')}$('#sheet').hidden=true}
-function showRemind(r){
-  sheet('⏰ '+(r.t||'תזכורת'),`<p class="mut" style="margin-bottom:12px">${esc(r.b||'')}</p>`+[10,30,60].map(m=>`<button class="act" data-sn="${m}">⏰ נודניק ${m===60?'שעה':m+' דקות'}</button>`).join(''));
-  $$('#sheetBody [data-sn]').forEach(b=>b.onclick=()=>snoozeFor(r,+b.dataset.sn));
-}
-if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',ev=>{const d=ev.data||{};if(d.type==='ring')beep();if(d.type==='remind')showRemind(d.r)});
+function showRemind(r){showAlarm(r)}
+if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',ev=>{const d=ev.data||{};if(d.type==='ring')d.r&&d.r.t?showAlarm(d.r):beep();if(d.type==='remind')showRemind(d.r)});
 try{const q=new URLSearchParams(location.search).get('r');if(q){showRemind(JSON.parse(q));history.replaceState(null,'',location.pathname)}}catch{}
 
 // בחירת שעה: שתי רשימות + כפתורי שעות מהירות
@@ -331,3 +330,15 @@ try{const q=new URLSearchParams(location.search).get('r');if(q){showRemind(JSON.
 $('#addEventBtn').onclick=()=>{$('#eventForm [name=date]').value=sel;$('#eventModal').hidden=false;setTimeout(()=>$('#eventForm [name=title]').focus(),50)};
 $('#eventCancel').onclick=()=>{$('#eventModal').hidden=true};
 $('#eventModal').onclick=e=>{if(e.target.id==='eventModal')$('#eventModal').hidden=true};
+
+// מסך התראה מלא עם צלצול מתמשך (עד "הבנתי" / נודניק, או עד 3 דקות)
+let alarmT=null,alarmAuto=null,alarmR=null;
+function stopRing(){clearInterval(alarmT);clearTimeout(alarmAuto);alarmT=alarmAuto=null;if(navigator.vibrate)navigator.vibrate(0)}
+function showAlarm(r){
+  alarmR=r;$('#alarmTitle').textContent=r.t||'תזכורת';$('#alarmBody').textContent=r.b||'';$('#alarm').hidden=false;
+  stopRing();const go=()=>{playTone(tone);if(navigator.vibrate)navigator.vibrate([500,200,500,200,500])};
+  go();if(localStorage.getItem('bny-loop')!=='0')alarmT=setInterval(go,3000);
+  alarmAuto=setTimeout(stopRing,180000);
+}
+$('#alarmStop').onclick=()=>{stopRing();$('#alarm').hidden=true;if(alarmR&&alarmR.e)fetch('/api/ack',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({eid:alarmR.e,at:alarmR.a})}).catch(()=>{})};
+$('#alarmSnooze').onclick=async()=>{stopRing();$('#alarm').hidden=true;const r=alarmR||{};await snoozeFor(r,10);if(!r.e)setTimeout(()=>showAlarm(r),10*60000)};

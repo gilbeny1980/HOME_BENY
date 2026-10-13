@@ -108,3 +108,11 @@ summary.btn{list-style:none;text-align:center}summary::-webkit-details-marker{di
 .timeRow{display:flex;align-items:center;gap:8px}.timeRow select{flex:1;font-size:26px;font-weight:600;text-align:center;padding:14px 4px;min-width:0;text-align-last:center}.timeRow b{font-size:28px}
 .chipsRow{display:flex;flex-wrap:wrap;gap:6px;direction:ltr}.qt{border:1.5px solid var(--line);background:var(--bg);color:var(--text);border-radius:999px;padding:8px 12px;font-weight:600;font-size:14px;cursor:pointer}.qt:active{background:var(--b1);color:#fff}
 #eventForm h3{margin:0}
+
+.alarm{position:fixed;inset:0;z-index:50;background:linear-gradient(160deg,#ff6a3d,#e0357a 55%,#6d4aff);display:grid;place-items:center;padding:24px;color:#fff;text-align:center}.alarm[hidden]{display:none}
+.alarmBox{display:flex;flex-direction:column;gap:14px;width:100%;max-width:360px}
+.alarmBox h2{margin:0;font-size:28px}.alarmBox p{margin:0 0 10px;font-size:18px;opacity:.95}
+.alarmBox .btn{font-size:18px;padding:16px;box-shadow:0 10px 24px rgba(0,0,0,.25)}
+.alarmBox .btn:not(.gold){background:#fff;color:#c0245f}
+.bellAnim{font-size:96px;animation:ring 1s ease-in-out infinite;transform-origin:50% 10%}
+@keyframes ring{0%,100%{transform:rotate(0)}10%{transform:rotate(18deg)}20%{transform:rotate(-16deg)}30%{transform:rotate(14deg)}40%{transform:rotate(-12deg)}50%{transform:rotate(8deg)}60%{transform:rotate(0)}}

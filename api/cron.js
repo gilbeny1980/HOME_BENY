@@ -1,5 +1,5 @@
 const webpush = require('web-push');
-const { markFired, wasFired, subsAll, subDel, subGet, snoozesDue, snoozeDel, getJSON, getUsers } = require('./_lib');
+const { markFired, wasFired, subsAll, subDel, subGet, snoozesDue, snoozeDel, getJSON, setJSON, getUsers } = require('./_lib');
 const REC = require('../rec.js');
 // Called every 5 minutes by GitHub Actions. Public on purpose: it only sends reminders that are already due,
 // and each reminder is sent once (markFired), so calling it extra times is harmless.
@@ -9,6 +9,10 @@ module.exports = async (req, res) => {
   try {
     const clean = v => String(v || '').replace(/[^A-Za-z0-9_-]/g, ''); // tolerate stray spaces/quotes/dots from copy-paste
     webpush.setVapidDetails((process.env.VAPID_SUBJECT || 'mailto:admin@example.com').trim(), clean(process.env.VAPID_PUBLIC_KEY), clean(process.env.VAPID_PRIVATE_KEY));
+    // keep a short log of who triggers this endpoint (shown in /api/health): helps verify the external scheduler works
+    const log = ((await getJSON('bny:cronlog')) || []).slice(-11);
+    log.push({ t: Date.now(), ua: String(req.headers['user-agent'] || '').slice(0, 40) });
+    await setJSON('bny:cronlog', log);
     const db = (await getJSON('bny:data')) || {};
     const users = await getUsers();
     const parents = users.filter(x => x.p).map(x => x.u);
@@ -31,9 +35,9 @@ module.exports = async (req, res) => {
         const title = 'תזכורת: ' + e.title + (kids.length ? ` (${kids.join(', ')})` : ''), body = `${date} בשעה ${e.time}`, to = recipients(kids);
         const first = await markFired(`${e.id}:${at}`);
         if (first) msgs.push({ title, body, to, eid: e.id, at });
-        // repeat every `nag` minutes (up to 3 times) until someone taps "got it" or snoozes
+        // repeat every `nag` minutes (up to 5 times) until someone taps "got it" or snoozes
         if (nag && !first && !(await wasFired(`ack:${e.id}:${at}`))) {
-          const k = Math.min(3, Math.floor((now - fire) / (nag * 60000)));
+          const k = Math.min(5, Math.floor((now - fire) / (nag * 60000)));
           if (k >= 1) {
             for (let j = 1; j < k; j++) await markFired(`${e.id}:${at}:n${j}`);
             if (await markFired(`${e.id}:${at}:n${k}`)) msgs.push({ title: '🔁 ' + title, body, to, eid: e.id, at });
