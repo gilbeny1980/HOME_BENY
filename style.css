@@ -116,3 +116,5 @@ summary.btn{list-style:none;text-align:center}summary::-webkit-details-marker{di
 .alarmBox .btn:not(.gold){background:#fff;color:#c0245f}
 .bellAnim{font-size:96px;animation:ring 1s ease-in-out infinite;transform-origin:50% 10%}
 @keyframes ring{0%,100%{transform:rotate(0)}10%{transform:rotate(18deg)}20%{transform:rotate(-16deg)}30%{transform:rotate(14deg)}40%{transform:rotate(-12deg)}50%{transform:rotate(8deg)}60%{transform:rotate(0)}}
+.timeRow select{font-size:16px;font-weight:500;padding:12px 14px;text-align:center;text-align-last:center}.timeRow b{font-size:18px}
+.qt{padding:6px 10px;font-size:13px}
