@@ -68,6 +68,7 @@ function renderTasks(){
   const today=iso(new Date());
   const l=live(db.tasks).filter(t=>tf==='all'||(tf==='done')===t.done);
   $('#taskList').innerHTML=l.length?l.map(t=>`<li class="item ${t.done?'done':''} ${!t.done&&t.due&&t.due<today?'late':''}" style="--c:${t.who?kidColor(t.who):'var(--b1)'}"><button class="check" data-id="${t.id}" data-a="tog">${t.done?'✓':''}</button><div class="main"><b>${esc(t.title)}</b><small>${t.who?`<span class="tag" style="--c:${kidColor(t.who)}">${esc(t.who)}</span> `:''}<small class="d">${t.due?'📅 '+fmtDate(t.due):''}</small></small></div><button class="del" data-id="${t.id}" data-a="del">🗑</button></li>`).join(''):'<li class="empty">אין משימות 🎉</li>';
+  renderCal();
 }
 $('#taskList').onclick=e=>{const b=e.target.closest('button');if(!b)return;const t=db.tasks.find(x=>x.id===b.dataset.id);if(b.dataset.a==='tog')touch(t).done=!t.done;else if(confirm('למחוק?')){t.del=1;touch(t)}save();renderTasks()};
 
@@ -79,12 +80,17 @@ function renderCal(){
   const start=new Date(y,m,1-new Date(y,m,1).getDay());
   const evs=live(db.events);let h='';
   for(let i=0;i<42;i++){const d=new Date(start);d.setDate(start.getDate()+i);const k=iso(d);
-    const dc=new Set();evs.forEach(e=>{if(REC.occursOn(e,k)){const ks=evKids(e);dc.add(ks.length?kidColor(ks[0]):'#ffc24a')}});const dm={[k]:dc.size?dc:null};
-    h+=`<button class="day ${d.getMonth()!==m?'out':''} ${k===today?'today':''} ${k===sel?'sel':''} " data-d="${k}">${d.getDate()}${dm[k]?`<i class="dots">${[...dm[k]].slice(0,3).map(c=>`<s style="background:${c}"></s>`).join('')}</i>`:''}</button>`}
+    const items=evs.filter(e=>REC.occursOn(e,k)).sort((p,q)=>p.time.localeCompare(q.time)).map(e=>({t:e.title,c:evKids(e).length?kidColor(evKids(e)[0]):'#ffc24a'}));
+    if(adminTok)live(db.tasks).filter(t=>t.due===k&&!t.done).forEach(t=>items.push({t:'☐ '+t.title,c:'#8a8aa5'}));
+    const shown=items.slice(0,3).map(x=>`<i style="--c:${x.c}">${esc(x.t)}</i>`).join('')+(items.length>3?`<i class="more">+${items.length-3}</i>`:'');
+    h+=`<button class="day ${d.getMonth()!==m?'out':''} ${k===today?'today':''} ${k===sel?'sel':''}" data-d="${k}"><span class="dn">${d.getDate()}</span><span class="dt">${shown}</span></button>`}
   $('#days').innerHTML=h;
   $('#selLabel').textContent=fmtDate(sel);
   const ev=evs.filter(e=>REC.occursOn(e,sel)).sort((a,b)=>a.time.localeCompare(b.time));
   $('#eventList').innerHTML=ev.length?ev.map(e=>`<li class="item" style="--c:${evKids(e).length?kidColor(evKids(e)[0]):'var(--b1)'}"><div class="avatar">${esc(e.time)}</div><div class="main"><b>${esc(e.title)}${kidTags(evKids(e))}</b><small>${e.rep?'🔁 '+REC.LABEL[e.rep]+(e.until?' עד '+e.until:'')+' · ':''}${e.nag?'🔂 כל '+e.nag+' דק׳ · ':''}${e.remind>=0?'🔔 '+$('#eventForm [name=remind] option[value="'+e.remind+'"]').textContent:'ללא תזכורת'}</small></div>${e.img?`<img class="evImg" data-img="${e.img}" alt="תמונה">`:''}<button class="share" data-s="${e.id}" title="שלח תזכורת">📤</button><button class="del" data-id="${e.id}">🗑</button></li>`).join(''):'<li class="empty">אין אירועים ביום זה</li>';
+  const tk=adminTok?live(db.tasks).filter(t=>t.due===sel):[];
+  $('#dayTasksH').hidden=!tk.length;
+  $('#dayTasks').innerHTML=tk.map(t=>`<li class="item ${t.done?'done':''}" style="--c:${t.who?kidColor(t.who):'var(--b1)'}"><div class="avatar">${t.done?'✓':'☐'}</div><div class="main"><b>${esc(t.title)}${t.who?`<span class="tag" style="--c:${kidColor(t.who)}">${esc(t.who)}</span>`:''}</b></div></li>`).join('');
   if($('#eventModal').hidden)$('#eventForm [name=date]').value=sel;
   hydrateImgs();renderToday();renderKids();
 }
@@ -228,7 +234,7 @@ $('#contactList').onclick=e=>{
 };
 
 
-function renderAdmin(){const on=!!adminTok;$('#adminGate').hidden=on;if(on)$('#otpForm').hidden=true;$('#adminBody').hidden=!on;renderContacts();if(on){renderTasks();loadUsers()}}
+function renderAdmin(){const on=!!adminTok;$('#adminGate').hidden=on;if(on)$('#otpForm').hidden=true;$('#adminBody').hidden=!on;renderContacts();renderCal();if(on){renderTasks();loadUsers()}}
 async function requestOtp(){
   try{const r=await fetch('/api/otp',{method:'POST',headers:hdr(),body:JSON.stringify({action:'request'})});
     if(r.status===429){toast('יותר מדי בקשות, נסה בעוד כמה דקות');return false}
