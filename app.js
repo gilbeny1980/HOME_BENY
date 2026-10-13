@@ -44,7 +44,9 @@ function renderToday(){
   $('#todaySum').textContent=ev.length?`היום ${ev.length} אירועים`+(nxt?` · הבא: ${nxt.title} ב־${nxt.time}`:''):'';
 }
 tick();setInterval(tick,1000);setInterval(()=>{renderToday();renderKids()},30000);
+let kidsBuilt=false;
 function renderKids(){
+  if(kidsBuilt)return;kidsBuilt=true;
   const opts='<option value="">כולם</option>'+KIDS.map(k=>`<option>${k[0]}</option>`).join('');
   $('#kidChecks').innerHTML=KIDS.map(([n,c])=>`<label class="ck" style="--c:${c}"><input type="checkbox" name="kids" value="${n}"><span>${n}</span></label>`).join('');
   $('#evKids').innerHTML=KIDS.map(([n,c])=>`<label class="ck" style="--c:${c}"><input type="checkbox" name="ekids" value="${n}"><span>${n}</span></label>`).join('');
@@ -83,10 +85,10 @@ function renderCal(){
   $('#selLabel').textContent=fmtDate(sel);
   const ev=evs.filter(e=>REC.occursOn(e,sel)).sort((a,b)=>a.time.localeCompare(b.time));
   $('#eventList').innerHTML=ev.length?ev.map(e=>`<li class="item" style="--c:${evKids(e).length?kidColor(evKids(e)[0]):'var(--b1)'}"><div class="avatar">${esc(e.time)}</div><div class="main"><b>${esc(e.title)}${kidTags(evKids(e))}</b><small>${e.rep?'🔁 '+REC.LABEL[e.rep]+(e.until?' עד '+e.until:'')+' · ':''}${e.nag?'🔂 כל '+e.nag+' דק׳ · ':''}${e.remind>=0?'🔔 '+$('#eventForm [name=remind] option[value="'+e.remind+'"]').textContent:'ללא תזכורת'}</small></div><button class="share" data-s="${e.id}" title="שלח תזכורת">📤</button><button class="del" data-id="${e.id}">🗑</button></li>`).join(''):'<li class="empty">אין אירועים ביום זה</li>';
-  $('#eventForm [name=date]').value=sel;
+  if(!$('#eventForm').closest('details').open)$('#eventForm [name=date]').value=sel;
   renderToday();renderKids();
 }
-$('#days').onclick=e=>{const d=e.target.closest('.day');if(!d)return;sel=d.dataset.d;const s=new Date(sel+'T00:00');view=new Date(s.getFullYear(),s.getMonth(),1);renderCal()};
+$('#days').onclick=e=>{const d=e.target.closest('.day');if(!d)return;sel=d.dataset.d;$('#eventForm [name=date]').value=sel;const s=new Date(sel+'T00:00');view=new Date(s.getFullYear(),s.getMonth(),1);renderCal()};
 $('#prevM').onclick=()=>{view.setMonth(view.getMonth()-1);renderCal()};
 $('#nextM').onclick=()=>{view.setMonth(view.getMonth()+1);renderCal()};
 $('#goToday').onclick=()=>{sel=iso(new Date());view=new Date();view.setDate(1);renderCal()};
@@ -295,3 +297,12 @@ function showRemind(r){
 }
 if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',ev=>{const d=ev.data||{};if(d.type==='ring')beep();if(d.type==='remind')showRemind(d.r)});
 try{const q=new URLSearchParams(location.search).get('r');if(q){showRemind(JSON.parse(q));history.replaceState(null,'',location.pathname)}}catch{}
+
+// בחירת שעה: שני רשימות (שעות / דקות) – עובד אמין בכל טלפון
+(function(){
+  const H=$('#evH'),M=$('#evM'),T=$('#eventForm [name=time]');
+  H.innerHTML=Array.from({length:24},(_,i)=>`<option>${pad(i)}</option>`).join('');
+  M.innerHTML=Array.from({length:60},(_,i)=>`<option>${pad(i)}</option>`).join('');
+  const [h,m]=T.value.split(':');H.value=h;M.value=m;
+  const upd=()=>{T.value=H.value+':'+M.value};H.onchange=upd;M.onchange=upd;
+})();
