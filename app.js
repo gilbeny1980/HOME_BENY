@@ -85,14 +85,14 @@ function renderCal(){
   $('#selLabel').textContent=fmtDate(sel);
   const ev=evs.filter(e=>REC.occursOn(e,sel)).sort((a,b)=>a.time.localeCompare(b.time));
   $('#eventList').innerHTML=ev.length?ev.map(e=>`<li class="item" style="--c:${evKids(e).length?kidColor(evKids(e)[0]):'var(--b1)'}"><div class="avatar">${esc(e.time)}</div><div class="main"><b>${esc(e.title)}${kidTags(evKids(e))}</b><small>${e.rep?'🔁 '+REC.LABEL[e.rep]+(e.until?' עד '+e.until:'')+' · ':''}${e.nag?'🔂 כל '+e.nag+' דק׳ · ':''}${e.remind>=0?'🔔 '+$('#eventForm [name=remind] option[value="'+e.remind+'"]').textContent:'ללא תזכורת'}</small></div><button class="share" data-s="${e.id}" title="שלח תזכורת">📤</button><button class="del" data-id="${e.id}">🗑</button></li>`).join(''):'<li class="empty">אין אירועים ביום זה</li>';
-  if(!$('#eventForm').closest('details').open)$('#eventForm [name=date]').value=sel;
+  if($('#eventModal').hidden)$('#eventForm [name=date]').value=sel;
   renderToday();renderKids();
 }
 $('#days').onclick=e=>{const d=e.target.closest('.day');if(!d)return;sel=d.dataset.d;$('#eventForm [name=date]').value=sel;const s=new Date(sel+'T00:00');view=new Date(s.getFullYear(),s.getMonth(),1);renderCal()};
 $('#prevM').onclick=()=>{view.setMonth(view.getMonth()-1);renderCal()};
 $('#nextM').onclick=()=>{view.setMonth(view.getMonth()+1);renderCal()};
 $('#goToday').onclick=()=>{sel=iso(new Date());view=new Date();view.setDate(1);renderCal()};
-$('#eventForm').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target);const tm=f.get('time')||'00:00';db.events.push(touch({id:uid(),title:f.get('title'),date:f.get('date'),time:tm,kids:f.getAll('ekids'),rep:f.get('rep')||'',nag:+f.get('nag')||0,until:f.get('rep')?(f.get('until')||''):'',at:new Date(`${f.get('date')}T${tm}`).getTime(),remind:+f.get('remind')}));sel=f.get('date');save();e.target.title.value='';$$('#evKids input').forEach(i=>i.checked=false);e.target.rep.value='';e.target.nag.value='0';$('#untilWrap').hidden=true;e.target.closest('details').open=false;renderCal();checkReminders();if(+f.get('remind')>=0&&Notification.permission==='default')askNotif()};
+$('#eventForm').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target);const tm=f.get('time')||'00:00';db.events.push(touch({id:uid(),title:f.get('title'),date:f.get('date'),time:tm,kids:f.getAll('ekids'),rep:f.get('rep')||'',nag:+f.get('nag')||0,until:f.get('rep')?(f.get('until')||''):'',at:new Date(`${f.get('date')}T${tm}`).getTime(),remind:+f.get('remind')}));sel=f.get('date');save();e.target.title.value='';$$('#evKids input').forEach(i=>i.checked=false);e.target.rep.value='';e.target.nag.value='0';$('#untilWrap').hidden=true;$('#eventModal').hidden=true;renderCal();checkReminders();if(+f.get('remind')>=0&&Notification.permission==='default')askNotif()};
 function shareEvent(ev){
   const ek=evKids(ev);const txt=`תזכורת: ${ev.title}${ek.length?' ('+ek.join(', ')+')':''} – ${fmtDate(ev.date)} בשעה ${ev.time}`;
   const cs=live(db.contacts).filter(c=>(c.phone||c.email)&&(!ek.length||!(c.kids||[]).length||ek.some(k=>(c.kids||[]).includes(k))));
@@ -105,10 +105,28 @@ $('#eventList').onclick=e=>{const s=e.target.closest('.share');if(s)return share
 
 // reminders (שרת-פוש חיצוני אינו נדרש: התראות מקומיות בכל מכשיר שבו האפליקציה מותקנת)
 // צלילי התראה לבחירה (מושמעים כשהאפליקציה פתוחה; כשהיא סגורה הצליל נקבע בהגדרות הטלפון)
-const TONES={classic:['צלצול קלאסי',[[880,0],[1175,.18],[1568,.36]],'sine'],bell:['פעמון',[[1318,0],[1046,.35],[1318,.7]],'triangle'],digital:['דיגיטלי',[[1000,0],[1000,.15],[1000,.3],[1500,.45]],'square'],soft:['עדין',[[523,0],[659,.3],[784,.6]],'sine'],alarm:['אזעקה',[[900,0],[600,.2],[900,.4],[600,.6],[900,.8]],'sawtooth'],silent:['שקט (בלי צליל)',[],'sine']};
-let tone=localStorage.getItem('bny-tone')||'classic';
-function playTone(name){try{const t=TONES[name]||TONES.classic;if(!t[1].length)return;const c=new (window.AudioContext||window.webkitAudioContext)();
-  t[1].forEach(([f,at])=>{const o=c.createOscillator(),g=c.createGain();o.frequency.value=f;o.type=t[2];o.connect(g);g.connect(c.destination);const s=c.currentTime+at;g.gain.setValueAtTime(.0001,s);g.gain.exponentialRampToValueAtTime(.3,s+.02);g.gain.exponentialRampToValueAtTime(.0001,s+.28);o.start(s);o.stop(s+.3)})}catch{}}
+const BELL=[[1,1],[2.76,.28],[5.4,.1]],PLUCK=[[1,1],[2,.35],[3,.15]],PURE=[[1,1],[2,.12]];
+// [שם, תווים[תדר,התחלה,אורך], צורת גל, הרמוניות, עוצמה]
+const TONES={
+  chime:['פעמוני קסם ✨',[[1046,0,1.1],[1318,.13,1.1],[1568,.26,1.1],[2093,.39,1.4]],'sine',BELL,.22],
+  harp:['נבל 🎶',[[523,0,.9],[659,.09,.9],[784,.18,.9],[1046,.27,.9],[1318,.36,.9],[1568,.45,1.2]],'triangle',PLUCK,.24],
+  crystal:['קריסטל 💎',[[2093,0,1.2],[1568,.16,1.2],[2637,.32,1.5]],'sine',BELL,.18],
+  lullaby:['ערש 🌙',[[784,0,.6],[659,.34,.6],[784,.68,.6],[659,1.02,.6],[523,1.36,1.1]],'sine',PURE,.26],
+  happy:['שמח 😀',[[523,0,.25],[659,.1,.25],[784,.2,.25],[1046,.3,.3],[784,.52,.25],[1046,.62,.5]],'triangle',PLUCK,.24],
+  marimba:['מרימבה 🥁',[[659,0,.28],[784,.14,.28],[1046,.28,.28],[1318,.42,.4]],'sine',[[1,1],[4,.2]],.3],
+  drops:['טיפות 💧',[[1568,0,.35],[1318,.28,.35],[1046,.56,.35],[1760,.95,.5]],'sine',PURE,.26],
+  bell:['פעמון',[[1318,0,.5],[1046,.35,.5],[1318,.7,.6]],'triangle',PURE,.28],
+  classic:['צלצול קלאסי',[[880,0,.28],[1175,.18,.28],[1568,.36,.4]],'sine',PURE,.3],
+  soft:['עדין',[[523,0,.5],[659,.3,.5],[784,.6,.7]],'sine',PURE,.26],
+  digital:['דיגיטלי',[[1000,0,.14],[1000,.15,.14],[1000,.3,.14],[1500,.45,.3]],'square',[[1,1]],.12],
+  alarm:['אזעקה',[[900,0,.2],[600,.2,.2],[900,.4,.2],[600,.6,.2],[900,.8,.3]],'sawtooth',[[1,1]],.14],
+  silent:['שקט (בלי צליל)',[],'sine',[[1,1]],0]
+};
+let tone=localStorage.getItem('bny-tone');if(!TONES[tone])tone='chime';
+function playTone(name){try{const t=TONES[name]||TONES.chime;if(!t[1].length)return;
+  const c=new (window.AudioContext||window.webkitAudioContext)();
+  t[1].forEach(([f,at,dur])=>{for(const [mult,amp] of t[3]){const o=c.createOscillator(),g=c.createGain();o.type=t[2];o.frequency.value=f*mult;o.connect(g);g.connect(c.destination);
+    const s=c.currentTime+at,v=t[4]*amp/(mult>1?1.2:1);g.gain.setValueAtTime(.0001,s);g.gain.exponentialRampToValueAtTime(v,s+.015);g.gain.exponentialRampToValueAtTime(.0001,s+dur);o.start(s);o.stop(s+dur+.05)}})}catch{}}
 function beep(){playTone(tone)}
 async function notify(title,body){
   toast('🔔 '+title);
@@ -298,11 +316,18 @@ function showRemind(r){
 if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',ev=>{const d=ev.data||{};if(d.type==='ring')beep();if(d.type==='remind')showRemind(d.r)});
 try{const q=new URLSearchParams(location.search).get('r');if(q){showRemind(JSON.parse(q));history.replaceState(null,'',location.pathname)}}catch{}
 
-// בחירת שעה: שני רשימות (שעות / דקות) – עובד אמין בכל טלפון
+// בחירת שעה: שתי רשימות + כפתורי שעות מהירות
 (function(){
   const H=$('#evH'),M=$('#evM'),T=$('#eventForm [name=time]');
   H.innerHTML=Array.from({length:24},(_,i)=>`<option>${pad(i)}</option>`).join('');
   M.innerHTML=Array.from({length:60},(_,i)=>`<option>${pad(i)}</option>`).join('');
-  const [h,m]=T.value.split(':');H.value=h;M.value=m;
-  const upd=()=>{T.value=H.value+':'+M.value};H.onchange=upd;M.onchange=upd;
+  const set=v=>{const [h,m]=v.split(':');H.value=h;M.value=m;T.value=v};
+  set(T.value);
+  H.onchange=M.onchange=()=>{T.value=H.value+':'+M.value};
+  const Q=['07:00','08:00','09:00','12:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00'];
+  $('#timeChips').innerHTML=Q.map(q=>`<button type="button" class="qt" data-q="${q}">${q}</button>`).join('');
+  $('#timeChips').onclick=e=>{const b=e.target.closest('[data-q]');if(b)set(b.dataset.q)};
 })();
+$('#addEventBtn').onclick=()=>{$('#eventForm [name=date]').value=sel;$('#eventModal').hidden=false;setTimeout(()=>$('#eventForm [name=title]').focus(),50)};
+$('#eventCancel').onclick=()=>{$('#eventModal').hidden=true};
+$('#eventModal').onclick=e=>{if(e.target.id==='eventModal')$('#eventModal').hidden=true};

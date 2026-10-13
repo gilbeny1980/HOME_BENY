@@ -105,3 +105,6 @@ summary.btn{list-style:none;text-align:center}summary::-webkit-details-marker{di
 #meBtn{font-weight:700;color:var(--b1)}
 .kids{gap:5px;justify-content:space-between}.kid{padding:5px 9px;font-size:13px;gap:4px}
 .timePick{display:flex;align-items:center;gap:4px;min-width:0}.timePick select{padding:12px 6px;text-align:center;flex:1;min-width:0}.timePick b{font-size:18px}
+.timeRow{display:flex;align-items:center;gap:8px}.timeRow select{flex:1;font-size:26px;font-weight:600;text-align:center;padding:14px 4px;min-width:0;text-align-last:center}.timeRow b{font-size:28px}
+.chipsRow{display:flex;flex-wrap:wrap;gap:6px;direction:ltr}.qt{border:1.5px solid var(--line);background:var(--bg);color:var(--text);border-radius:999px;padding:8px 12px;font-weight:600;font-size:14px;cursor:pointer}.qt:active{background:var(--b1);color:#fff}
+#eventForm h3{margin:0}

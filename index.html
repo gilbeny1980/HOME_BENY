@@ -50,37 +50,7 @@
     </div>
     <h3 id="selLabel" class="sec"></h3>
     <ul id="eventList" class="list"></ul>
-    <details class="card">
-      <summary class="btn gold">＋ אירוע חדש</summary>
-      <form id="eventForm" class="form" style="margin-top:12px">
-        <input name="title" placeholder="אירוע חדש (למשל: חוג ריקוד)" required>
-        <div class="row">
-          <input name="date" type="date" required>
-          <div class="timePick" dir="ltr"><select id="evH" aria-label="שעה"></select><b>:</b><select id="evM" aria-label="דקות"></select></div>
-          <input type="hidden" name="time" value="18:00">
-        </div>
-        <div class="lbl">עבור (אפשר כמה · ריק = כולם)</div>
-        <div id="evKids" class="checks"></div>
-        <label class="lbl">חזרה
-          <select name="rep" id="repSel">
-            <option value="">ללא חזרה</option><option value="d">כל יום</option><option value="w">כל שבוע</option>
-            <option value="2w">כל שבועיים</option><option value="m">כל חודש</option><option value="y">כל שנה</option>
-          </select>
-        </label>
-        <label class="lbl" id="untilWrap" hidden>חוזר עד תאריך (לא חובה)<input name="until" type="date"></label>
-        <label class="lbl">תזכורת
-          <select name="remind">
-            <option value="-1">ללא</option><option value="0">בזמן האירוע</option>
-            <option value="15">15 דקות לפני</option><option value="60" selected>שעה לפני</option>
-            <option value="180">3 שעות לפני</option><option value="1440">יום לפני</option>
-          </select>
-        </label>
-        <label class="lbl">חזור להתריע עד שתאשר (עד 3 פעמים)
-          <select name="nag"><option value="0">לא</option><option value="5">כל 5 דקות</option><option value="10">כל 10 דקות</option><option value="15">כל 15 דקות</option><option value="30">כל 30 דקות</option></select>
-        </label>
-        <button class="btn">＋ הוסף ללוח</button>
-      </form>
-    </details>
+    <button id="addEventBtn" class="btn gold" type="button" style="width:100%;margin-bottom:16px">＋ אירוע חדש</button>
   </section>
 
   <!-- אנשי קשר -->
@@ -163,6 +133,40 @@
       <p class="mut">שלחנו קוד בן 6 ספרות למייל של המנהל.</p>
       <input name="code" inputmode="numeric" maxlength="6" placeholder="______" dir="ltr" required autocomplete="one-time-code">
       <button class="btn">אישור</button>
+    </form>
+  </div>
+</div>
+<div id="eventModal" class="sheet" hidden>
+  <div class="sheetBox">
+    <form id="eventForm" class="form">
+      <h3>אירוע חדש</h3>
+      <input name="title" placeholder="שם האירוע (למשל: חוג ריקוד)" required>
+      <label class="lbl">תאריך<input name="date" type="date" required></label>
+      <div class="lbl">שעה</div>
+      <div class="timeRow" dir="ltr"><select id="evH" aria-label="שעה"></select><b>:</b><select id="evM" aria-label="דקות"></select></div>
+      <div id="timeChips" class="chipsRow"></div>
+      <input type="hidden" name="time" value="18:00">
+      <div class="lbl">עבור (אפשר כמה · ריק = כולם)</div>
+      <div id="evKids" class="checks"></div>
+      <label class="lbl">חזרה
+        <select name="rep" id="repSel">
+          <option value="">ללא חזרה</option><option value="d">כל יום</option><option value="w">כל שבוע</option>
+          <option value="2w">כל שבועיים</option><option value="m">כל חודש</option><option value="y">כל שנה</option>
+        </select>
+      </label>
+      <label class="lbl" id="untilWrap" hidden>חוזר עד תאריך (לא חובה)<input name="until" type="date"></label>
+      <label class="lbl">תזכורת
+        <select name="remind">
+          <option value="-1">ללא</option><option value="0">בזמן האירוע</option>
+          <option value="15">15 דקות לפני</option><option value="60" selected>שעה לפני</option>
+          <option value="180">3 שעות לפני</option><option value="1440">יום לפני</option>
+        </select>
+      </label>
+      <label class="lbl">חזור להתריע עד שתאשר (עד 3 פעמים)
+        <select name="nag"><option value="0">לא</option><option value="5">כל 5 דקות</option><option value="10">כל 10 דקות</option><option value="15">כל 15 דקות</option><option value="30">כל 30 דקות</option></select>
+      </label>
+      <button class="btn">＋ הוסף ללוח</button>
+      <button type="button" class="btn ghost" id="eventCancel">ביטול</button>
     </form>
   </div>
 </div>
