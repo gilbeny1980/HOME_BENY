@@ -155,6 +155,7 @@ async function sync(){
     const m=await r.json();
     if(JSON.stringify(cmp)!==JSON.stringify(m)){Object.assign(db,m);localStorage.setItem(KEY,JSON.stringify(db));renderAll()}
     enablePush();
+    pingCron();
   }catch(e){}finally{syncing=false}
 }
 setInterval(()=>{if(!document.hidden)sync()},30000);
@@ -270,3 +271,7 @@ function renderAdminContacts(){
 $('#adminContacts').onclick=e=>{
   const ed=e.target.closest('[data-edit]');if(ed)return editContact(db.contacts.find(c=>c.id===ed.dataset.edit));
   const dl=e.target.closest('[data-del]');if(dl&&confirm('למחוק את איש הקשר?')){const c=db.contacts.find(c=>c.id===dl.dataset.del);c.del=1;touch(c);save();renderContacts()}};
+
+// כל מכשיר פתוח מעורר את בדיקת התזכורות בשרת (לכל היותר פעם בדקה) – גיבוי למתזמן החיצוני
+let lastCron=0;
+function pingCron(){if(Date.now()-lastCron<55000)return;lastCron=Date.now();fetch('/api/cron').catch(()=>{})}
