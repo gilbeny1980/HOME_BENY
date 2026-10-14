@@ -401,12 +401,20 @@ function renderAdminEvents(){
   if(!adminTok){$('#adminEvents').innerHTML='';return}
   const t=iso(new Date());
   const l=live(db.events).map(e=>({e,d:nextDate(e)})).sort((x,y)=>(x.d<t)-(y.d<t)||x.d.localeCompare(y.d)||x.e.time.localeCompare(y.e.time));
-  $('#adminEvents').innerHTML=l.length?l.map(({e,d})=>`<li class="item ${d<t?'done':''}" style="--c:${evKids(e).length?kidColor(evKids(e)[0]):'var(--b1)'}"><div class="avatar" style="background:${kidBg(evKids(e))}">${esc(e.time)}</div><div class="main"><b>${esc(e.title)}${kidTags(evKids(e))}</b><small>${fmtDate(d)}${e.rep?' · 🔁 '+REC.LABEL[e.rep]:''}</small></div><button class="share" data-ed="${e.id}" title="עריכה">✏️</button><button class="del" data-xd="${e.id}">🗑</button></li>`).join(''):'<li class="empty">אין אירועים</li>';
+  $('#adminEvents').innerHTML=l.length?l.map(({e,d})=>`<li class="item ${d<t?'done':''}" style="--c:${evKids(e).length?kidColor(evKids(e)[0]):'var(--b1)'}"><div class="avatar" style="background:${kidBg(evKids(e))}">${esc(e.time)}</div><div class="main"><b>${esc(e.title)}${kidTags(evKids(e))}</b><small>${fmtDate(d)}${e.rep?' · 🔁 '+REC.LABEL[e.rep]:''}</small></div><button class="share" data-nt="${e.id}" title="שלח עכשיו">🔔</button><button class="share" data-ed="${e.id}" title="עריכה">✏️</button><button class="del" data-xd="${e.id}">🗑</button></li>`).join(''):'<li class="empty">אין אירועים</li>';
 }
 $('#adminEvents').onclick=e=>{
+  const nt=e.target.closest('[data-nt]');if(nt)return sendNow(nt.dataset.nt);
   const ed=e.target.closest('[data-ed]');if(ed)return openEventForm(db.events.find(x=>x.id===ed.dataset.ed));
   const xd=e.target.closest('[data-xd]');if(!xd)return;const ev=db.events.find(x=>x.id===xd.dataset.xd);
   if(ev&&confirm(ev.rep?'למחוק את כל האירועים החוזרים?':'למחוק את האירוע?')){ev.del=1;touch(ev);if(ev.img)fetch('/api/image?id='+ev.img,{method:'DELETE',headers:hdr()}).catch(()=>{});save();renderCal()}};
 
 $('#userList').addEventListener('change',async e=>{const c=e.target.closest('[data-uc]');if(!c)return;
   const d=await usersCall({action:'save',u:c.dataset.uc,n:c.dataset.n,p:!!c.dataset.p,c:c.value});if(d){renderUsers(d.users);setFamily(d.users);toast('הצבע נשמר')}});
+
+// שליחת התראה עכשיו (מנהל): לאנשי האירוע ולהורים
+async function sendNow(id){
+  const ev=db.events.find(x=>x.id===id);if(!ev)return;
+  const ks=evKids(ev);if(!confirm(`לשלוח עכשיו את ההתראה "${ev.title}" ל${ks.length?ks.join(', ')+' ולהורים':'כולם'}?`))return;
+  try{const r=await fetch('/api/notify',{method:'POST',headers:hdr(),body:JSON.stringify({eid:id})});const d=await r.json().catch(()=>({}));
+    toast(r.ok?`נשלחה ל־${d.sent} מכשירים${d.failed?` (נכשלו ${d.failed})`:''}`:'השליחה נכשלה: '+(d.error||r.status))}catch{toast('אין חיבור לשרת')}}
