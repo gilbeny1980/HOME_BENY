@@ -311,7 +311,7 @@ async function testPush(){
   if(!(await enablePush(true)))return;
   try{
     const sub=await (await navigator.serviceWorker.ready).pushManager.getSubscription();
-    const r=await fetch('/api/push-test',{method:'POST',headers:hdr(),body:JSON.stringify({endpoint:sub.endpoint})});
+    const r=await fetch('/api/subscribe',{method:'POST',headers:hdr(),body:JSON.stringify({test:true,endpoint:sub.endpoint})});
     const d=await r.json().catch(()=>({}));
     if(r.ok)toast('נשלחה התראת בדיקה – אמורה להופיע תוך שניות');else toast('השרת לא הצליח לשלוח: '+(d.error||r.status));
   }catch(e){toast('שגיאה: '+(e.message||e))}
@@ -377,7 +377,7 @@ function showAlarm(r){
   go();if(localStorage.getItem('bny-loop')!=='0')alarmT=setInterval(go,3000);
   alarmAuto=setTimeout(stopRing,180000);
 }
-$('#alarmStop').onclick=()=>{stopRing();$('#alarm').hidden=true;if(alarmR&&alarmR.e)fetch('/api/ack',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({eid:alarmR.e,at:alarmR.a})}).catch(()=>{})};
+$('#alarmStop').onclick=()=>{stopRing();$('#alarm').hidden=true;if(alarmR&&alarmR.e)fetch('/api/snooze',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'ack',eid:alarmR.e,at:alarmR.a})}).catch(()=>{})};
 $('#alarmSnooze').onclick=async()=>{stopRing();$('#alarm').hidden=true;const r=alarmR||{};await snoozeFor(r,10);if(!r.e)setTimeout(()=>showAlarm(r),10*60000)};
 
 // תמונה לאירוע: מכווצים בדפדפן, מעלים לשרת, ומציגים לפי מזהה
