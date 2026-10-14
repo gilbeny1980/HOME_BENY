@@ -5,11 +5,15 @@ let db={tasks:[],events:[],contacts:[],notes:[],fired:{}};
 try{db=Object.assign(db,JSON.parse(localStorage.getItem(KEY)||'{}'))}catch{}
 let token=localStorage.getItem('bny-token')||'';
 let myName=localStorage.getItem('bny-name')||'';
+let myUser=localStorage.getItem('bny-user')||'';
+let FAMU=(()=>{try{return JSON.parse(localStorage.getItem('bny-famfull')||'[]')}catch{return[]}})();
+const isParent=()=>!!adminTok||myUser==='admin'||(FAMU.length?!!FAMU.find(u=>u.u===myUser&&u.p):['gil','adva'].includes(myUser));
 const PALETTE=['#e0527a','#8e5bd6','#2f9e8f','#e8912d','#3b82c4','#c2410c','#0f766e','#a21caf'];
 let KIDS=(()=>{try{const f=JSON.parse(localStorage.getItem('bny-fam')||'null');if(f&&f.length)return f}catch{}return [['לינוי','#e0527a'],['רומי','#8e5bd6'],['אלין','#2f9e8f'],['גיל','#e8912d'],['אדוה','#3b82c4']]})();
 const kidColor=n=>(KIDS.find(k=>k[0]===n)||[])[1]||'#888';
 const kidBg=ks=>!ks.length?'var(--g)':ks.length===1?kidColor(ks[0]):`linear-gradient(135deg,${ks.map(kidColor).join(',')})`;
 function setFamily(users){
+  FAMU=users;localStorage.setItem('bny-famfull',JSON.stringify(users));
   const sorted=[...users].sort((x,y)=>(x.p?1:0)-(y.p?1:0));
   KIDS=sorted.map((u,i)=>[u.n,u.c||PALETTE[i%PALETTE.length]]);
   localStorage.setItem('bny-fam',JSON.stringify(KIDS));
@@ -112,7 +116,7 @@ $('#eventForm').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.tar
   if(pendingImg){try{const r=await fetch('/api/image',{method:'POST',headers:hdr(),body:JSON.stringify({data:pendingImg})});if(r.ok)imgId=(await r.json()).id;else toast('העלאת התמונה נכשלה')}catch{toast('העלאת התמונה נכשלה')}}
   if(origImg&&imgId!==origImg)fetch('/api/image?id='+origImg,{method:'DELETE',headers:hdr()}).catch(()=>{});
   const tm=f.get('time')||'00:00',rep=f.get('rep')||'';let saved=null;
-  const data={title:f.get('title'),date:f.get('date'),time:tm,kids:f.getAll('ekids'),img:imgId,rep,nag:+f.get('nag')||0,until:rep?(f.get('until')||''):'',at:new Date(`${f.get('date')}T${tm}`).getTime(),remind:+f.get('remind')};
+  const data={req:!!f.get('req'),title:f.get('title'),date:f.get('date'),time:tm,kids:f.getAll('ekids'),img:imgId,rep,nag:+f.get('nag')||0,until:rep?(f.get('until')||''):'',at:new Date(`${f.get('date')}T${tm}`).getTime(),remind:+f.get('remind')};
   if(editEv){const x=db.events.find(v=>v.id===editEv);if(x){Object.assign(x,data);delete x.kid;touch(x)}}else{saved=touch({id:uid(),...data});db.events.push(saved)}
   sel=f.get('date');save();editEv='';clearImg();$('#eventModal').hidden=true;renderCal();checkReminders();
   if(saved&&f.get('wa'))setTimeout(()=>shareEvent(saved),300);
@@ -210,6 +214,7 @@ async function sync(){
     enablePush();
     pingCron();
     if(famTick++%10===0)loadFamily();
+    loadPending();
   }catch(e){}finally{syncing=false}
 }
 setInterval(()=>{if(!document.hidden)sync()},30000);
@@ -279,13 +284,13 @@ $('#pwForm').onsubmit=async e=>{e.preventDefault();const d=await usersCall({acti
 // login screen
 function showLogin(){$('#login').hidden=false;$('#meBtn').hidden=true}
 function renderMe(){const b=$('#meBtn');b.hidden=!token;b.textContent='👤 '+(myName||'')}
-function logout(expired){token='';adminTok='';myName='';['bny-token','bny-admin','bny-name'].forEach(k=>localStorage.removeItem(k));renderAdmin();renderToday();showLogin();if(expired)toast('יש להתחבר מחדש')}
-function loggedIn(t,name){token=t;myName=name;localStorage.setItem('bny-token',t);localStorage.setItem('bny-name',name);$('#login').hidden=true;renderMe();renderToday();sync()}
+function logout(expired){token='';adminTok='';myName='';myUser='';['bny-token','bny-admin','bny-name','bny-user'].forEach(k=>localStorage.removeItem(k));renderAdmin();renderToday();showLogin();if(expired)toast('יש להתחבר מחדש')}
+function loggedIn(t,name,uname){token=t;myName=name;myUser=uname||'admin';localStorage.setItem('bny-token',t);localStorage.setItem('bny-name',name);localStorage.setItem('bny-user',myUser);$('#login').hidden=true;renderMe();renderToday();sync()}
 $('#loginFormMain').onsubmit=async e=>{e.preventDefault();const f=Object.fromEntries(new FormData(e.target));
   try{const r=await fetch('/api/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(f)});
     if(r.status===429)return toast('יותר מדי ניסיונות, נסה בעוד כמה דקות');
     if(!r.ok)return toast('שם משתמש או סיסמה שגויים');
-    const d=await r.json();e.target.reset();loggedIn(d.token,d.name)}catch{toast('אין חיבור לשרת')}};
+    const d=await r.json();e.target.reset();loggedIn(d.token,d.name,d.username)}catch{toast('אין חיבור לשרת')}};
 $('#mgrBtn').onclick=async()=>{if(await requestOtp())$('#loginOtp').hidden=false};
 $('#loginOtp').onsubmit=async e=>{e.preventDefault();const t=await verifyOtp(e.target.code.value);if(!t)return;
   adminTok=t.token;localStorage.setItem('bny-admin',adminTok);e.target.reset();e.target.hidden=true;renderAdmin();loggedIn(t.token,'מנהל')};
@@ -360,7 +365,7 @@ function openEventForm(ev){
   f.title.value=ev?ev.title:'';f.date.value=ev?ev.date:sel;setEvTime(ev?ev.time:'18:00');
   $$('#evKids input').forEach(i=>i.checked=ev?evKids(ev).includes(i.value):false);
   f.rep.value=ev?(ev.rep||''):'';$('#untilWrap').hidden=!(ev&&ev.rep);f.until.value=ev&&ev.until||'';
-  f.remind.value=ev?String(ev.remind):'60';f.nag.value=ev?String(ev.nag||0):'5';
+  f.req.checked=!!(ev&&ev.req);f.remind.value=ev?String(ev.remind):'60';f.nag.value=ev?String(ev.nag||0):'5';
   if(curImg)getImg(curImg).then(d=>{if(d&&editEv===ev.id){$('#evImgThumb').src=d;$('#evImgPrev').hidden=false}});
   $('#eventModal').hidden=false;if(!ev)setTimeout(()=>f.title.focus(),50);
 }
@@ -372,12 +377,14 @@ $('#eventModal').onclick=e=>{if(e.target.id==='eventModal')$('#eventModal').hidd
 let alarmT=null,alarmAuto=null,alarmR=null;
 function stopRing(){clearInterval(alarmT);clearTimeout(alarmAuto);alarmT=alarmAuto=null;if(navigator.vibrate)navigator.vibrate(0)}
 function showAlarm(r){
-  alarmR=r;$('#alarmTitle').textContent=r.t||'תזכורת';$('#alarmBody').textContent=r.b||'';$('#alarm').hidden=false;
+  alarmR=r;const conf=!!r.q&&isParent();$('#alarmSnooze').hidden=!!r.q;$('#alarmStop').textContent=r.q?(conf?'✔ בוצע – אישרתי':'הבנתי'):'✔ הבנתי – הפסק';$('#alarmTitle').textContent=r.t||'תזכורת';$('#alarmBody').textContent=r.b||'';$('#alarm').hidden=false;
   stopRing();const go=()=>{playTone(tone);if(navigator.vibrate)navigator.vibrate([500,200,500,200,500])};
   go();if(localStorage.getItem('bny-loop')!=='0')alarmT=setInterval(go,3000);
   alarmAuto=setTimeout(stopRing,180000);
 }
-$('#alarmStop').onclick=()=>{stopRing();$('#alarm').hidden=true;if(alarmR&&alarmR.e)fetch('/api/snooze',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'ack',eid:alarmR.e,at:alarmR.a})}).catch(()=>{})};
+$('#alarmStop').onclick=()=>{stopRing();$('#alarm').hidden=true;const r=alarmR||{};if(!r.e)return;
+  if(r.q){if(isParent())confirmDone(r.e,r.a)}
+  else fetch('/api/snooze',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'ack',eid:r.e,at:r.a})}).catch(()=>{})};
 $('#alarmSnooze').onclick=async()=>{stopRing();$('#alarm').hidden=true;const r=alarmR||{};await snoozeFor(r,10);if(!r.e)setTimeout(()=>showAlarm(r),10*60000)};
 
 // תמונה לאירוע: מכווצים בדפדפן, מעלים לשרת, ומציגים לפי מזהה
@@ -436,3 +443,16 @@ async function diagnose(){
   if(perm==='granted'&&reg){try{await reg.showNotification('בדיקה מקומית 🔔',{body:'אם ראית את זה – התצוגה במכשיר תקינה',icon:'icons/icon-192.png',tag:'bny-local-test'});L.push('ℹ️ נשלחה גם התראה מקומית מהמכשיר עצמו')}catch(e){ok(false,'התראה מקומית נכשלה: '+(e.message||e))}}
   sheet('🩺 בדיקת התראות',`<div style="line-height:1.9;font-size:15px;text-align:right">${L.map(esc).join('<br>')}</div><p class="mut" style="margin-top:12px;font-size:12px">אם מופיע ✅ בכל השורות אבל לא קפצה התראה – הבעיה בהגדרות הטלפון (התראות של האפליקציה/הדפדפן, חיסכון בסוללה, "נא לא להפריע").</p>`);
 }
+
+// משימות שממתינות לאישור ביצוע מגיל / אדוה (או המנהל)
+async function confirmDone(eid,at){
+  try{const r=await fetch('/api/pending',{method:'POST',headers:hdr(),body:JSON.stringify({eid,at})});
+    toast(r.ok?'אושר ✔ – ההתראות נפסקו':'רק גיל, אדוה או המנהל יכולים לאשר');loadPending()}catch{toast('אין חיבור לשרת')}}
+async function loadPending(){
+  const box=$('#pendingBox');if(!token){box.hidden=true;return}
+  try{const r=await fetch('/api/pending',{headers:hdr()});if(!r.ok){box.hidden=true;return}
+    const d=await r.json();
+    if(!d.can||!d.pending.length){box.hidden=true;return}
+    $('#pendingList').innerHTML=d.pending.map(p=>`<li class="item" style="--c:${p.kids&&p.kids.length?kidColor(p.kids[0]):'var(--b1)'}"><div class="avatar" style="background:${kidBg(p.kids||[])}">${esc(p.time)}</div><div class="main"><b>${esc(p.title)}${kidTags(p.kids||[])}</b><small>${fmtDate(p.date)}</small></div><button class="btn doneBtn" data-eid="${p.eid}" data-at="${p.at}">✔ בוצע</button></li>`).join('');
+    box.hidden=false}catch{}}
+$('#pendingList').onclick=e=>{const b=e.target.closest('.doneBtn');if(b)confirmDone(b.dataset.eid,+b.dataset.at)};

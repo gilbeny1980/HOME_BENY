@@ -1,9 +1,17 @@
-const { subGet, snoozeAdd, markFired } = require('./_lib');
+const { subGet, subUname, canConfirm, snoozeAdd, markFired } = require('./_lib');
 // Called by the service worker / alarm screen (no login there): the device's own push endpoint is the credential for snooze.
 // action 'ack' = "got it": stops repeat reminders for that occurrence.
 module.exports = async (req, res) => {
   try {
     const b = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {};
+    if (b.action === 'done') { // "task done" tapped on a notification: only a parent's / the manager's device counts
+      if (!b.eid || !b.at || !b.endpoint) return res.status(400).json({ error: 'missing' });
+      const un = await subUname(b.endpoint);
+      if (un === undefined) return res.status(404).json({ error: 'device not registered' });
+      if (un !== null && !(await canConfirm(un, false))) return res.status(403).json({ error: 'only a parent can confirm' });
+      await markFired(`done:${b.eid}:${b.at}`);
+      return res.status(200).json({ ok: true });
+    }
     if (b.action === 'ack') {
       if (!b.eid || !b.at) return res.status(400).json({ error: 'missing' });
       await markFired(`ack:${b.eid}:${b.at}`);

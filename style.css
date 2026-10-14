@@ -144,3 +144,6 @@ summary.btn{list-style:none;text-align:center}summary::-webkit-details-marker{di
 .colorPick{width:44px;height:44px;padding:0;border:0;border-radius:14px;background:none;cursor:pointer;flex:none}
 .act.wa{background:linear-gradient(135deg,#25d366,#128c7e);color:#fff}.act.wa small{opacity:.9}
 .miniWa{font-size:14px !important;background:#25d366;color:#fff;border-radius:999px;padding:6px 12px;font-weight:600}
+
+.pendingCard{border:2px solid #e5484d;background:linear-gradient(180deg,rgba(229,72,77,.08),transparent)}
+.doneBtn{padding:10px 14px;background:linear-gradient(135deg,#18b37e,#0e8f66);box-shadow:none;white-space:nowrap}

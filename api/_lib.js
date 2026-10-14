@@ -29,6 +29,12 @@ const snoozeAdd = (endpoint, t, title, body, eid, at) => exec('INSERT INTO snooz
 const snoozesDue = async now => (await exec('SELECT id, endpoint, title, body, eid, at FROM snoozes WHERE t <= ?', [now])).rows;
 const snoozeDel = id => exec('DELETE FROM snoozes WHERE id = ?', [id]);
 const wasFired = async k => (await exec('SELECT 1 AS x FROM fired WHERE k = ?', [k])).rows.length > 0;
+const subUname = async endpoint => { const r = await exec('SELECT uname FROM subs WHERE endpoint = ?', [endpoint]); return r.rows[0] ? (r.rows[0].uname || null) : undefined; };
+// who may confirm "done": the parents (flag p) and the manager
+async function canConfirm(uname, admin) {
+  if (admin || uname === 'admin') return true;
+  return !!(await getUsers()).find(x => x.u === uname && x.p);
+}
 const subDel = endpoint => exec('DELETE FROM subs WHERE endpoint = ?', [endpoint]);
 // true only the first time a key is marked (prevents duplicate reminders)
 const markFired = async k => (await exec('INSERT OR IGNORE INTO fired (k) VALUES (?)', [k])).rowsAffected > 0;
@@ -88,4 +94,4 @@ async function setPassword(pw) {
   await exec("DELETE FROM sess WHERE role = 'user'"); // everyone must log in again with the new password
 }
 
-module.exports = { snoozeAdd, snoozesDue, snoozeDel, wasFired, subGet, subCount, exec, sha, isAdmin, newSession, getSession, getUsers, checkPassword, setPassword, subPut, subsAll, subDel, markFired, getJSON, setJSON, merge, auth };
+module.exports = { subUname, canConfirm, snoozeAdd, snoozesDue, snoozeDel, wasFired, subGet, subCount, exec, sha, isAdmin, newSession, getSession, getUsers, checkPassword, setPassword, subPut, subsAll, subDel, markFired, getJSON, setJSON, merge, auth };
