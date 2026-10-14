@@ -289,8 +289,8 @@ $('#loginFormMain').onsubmit=async e=>{e.preventDefault();const f=Object.fromEnt
 $('#mgrBtn').onclick=async()=>{if(await requestOtp())$('#loginOtp').hidden=false};
 $('#loginOtp').onsubmit=async e=>{e.preventDefault();const t=await verifyOtp(e.target.code.value);if(!t)return;
   adminTok=t.token;localStorage.setItem('bny-admin',adminTok);e.target.reset();e.target.hidden=true;renderAdmin();loggedIn(t.token,'מנהל')};
-$('#meBtn').onclick=()=>{sheet(myName||'משתמש',`<label class="lbl">🎵 צלצול התראה (כשהאפליקציה פתוחה)</label><div class="row" style="margin-bottom:10px"><select id="toneSel">${Object.entries(TONES).map(([k,v])=>`<option value="${k}" ${k===tone?'selected':''}>${v[0]}</option>`).join('')}</select><button class="btn" id="toneTry" style="flex:none">▶ השמע</button></div><label class="lbl" style="flex-direction:row;gap:8px;align-items:center;margin-bottom:10px;color:var(--text)"><input type="checkbox" id="loopChk" ${localStorage.getItem('bny-loop')!=='0'?'checked':''} style="width:auto"> צלצול מתמשך עד שלוחצים "הבנתי"</label><p class="mut" style="margin-bottom:10px;font-size:12px">כשהאפליקציה סגורה, הצליל נקבע בהגדרות ההתראות של הטלפון.</p><button class="act" id="testPush">🔔 שלח לי התראת בדיקה</button><button class="act" id="logoutBtn">🚪 התנתק</button>`);
-  $('#testPush').onclick=testPush;$('#loopChk').onchange=e=>localStorage.setItem('bny-loop',e.target.checked?'1':'0');$('#toneSel').onchange=e=>{tone=e.target.value;localStorage.setItem('bny-tone',tone);playTone(tone)};$('#toneTry').onclick=()=>playTone($('#toneSel').value);$('#logoutBtn').onclick=()=>{$('#sheet').hidden=true;logout()}};
+$('#meBtn').onclick=()=>{sheet(myName||'משתמש',`<label class="lbl">🎵 צלצול התראה (כשהאפליקציה פתוחה)</label><div class="row" style="margin-bottom:10px"><select id="toneSel">${Object.entries(TONES).map(([k,v])=>`<option value="${k}" ${k===tone?'selected':''}>${v[0]}</option>`).join('')}</select><button class="btn" id="toneTry" style="flex:none">▶ השמע</button></div><label class="lbl" style="flex-direction:row;gap:8px;align-items:center;margin-bottom:10px;color:var(--text)"><input type="checkbox" id="loopChk" ${localStorage.getItem('bny-loop')!=='0'?'checked':''} style="width:auto"> צלצול מתמשך עד שלוחצים "הבנתי"</label><p class="mut" style="margin-bottom:10px;font-size:12px">כשהאפליקציה סגורה, הצליל נקבע בהגדרות ההתראות של הטלפון.</p><button class="act" id="testPush">🔔 שלח לי התראת בדיקה</button><button class="act" id="diagBtn">🩺 בדיקת התראות במכשיר</button><button class="act" id="logoutBtn">🚪 התנתק</button>`);
+  $('#testPush').onclick=testPush;$('#diagBtn').onclick=diagnose;$('#loopChk').onchange=e=>localStorage.setItem('bny-loop',e.target.checked?'1':'0');$('#toneSel').onchange=e=>{tone=e.target.value;localStorage.setItem('bny-tone',tone);playTone(tone)};$('#toneTry').onclick=()=>playTone($('#toneSel').value);$('#logoutBtn').onclick=()=>{$('#sheet').hidden=true;logout()}};
 function renderAll(){renderToday();renderKids();renderAdmin();renderCal();renderContacts()}
 renderAll();renderMe();updNotifBtn();checkReminders();sync();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
@@ -418,3 +418,21 @@ async function sendNow(id){
   const ks=evKids(ev);if(!confirm(`לשלוח עכשיו את ההתראה "${ev.title}" ל${ks.length?ks.join(', ')+' ולהורים':'כולם'}?`))return;
   try{const r=await fetch('/api/notify',{method:'POST',headers:hdr(),body:JSON.stringify({eid:id})});const d=await r.json().catch(()=>({}));
     toast(r.ok?`נשלחה ל־${d.sent} מכשירים${d.failed?` (נכשלו ${d.failed})`:''}`:'השליחה נכשלה: '+(d.error||r.status))}catch{toast('אין חיבור לשרת')}}
+
+// אבחון התראות במכשיר
+async function diagnose(){
+  const L=[];const ok=(c,t)=>L.push((c?'✅ ':'❌ ')+t);
+  ok('Notification' in window,'הדפדפן תומך בהתראות');
+  const perm=('Notification' in window)?Notification.permission:'none';ok(perm==='granted','הרשאת התראות: '+({granted:'אושרה',denied:'נחסמה',default:'לא נשאלה'}[perm]||perm));
+  const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone;
+  L.push((standalone?'✅ ':'ℹ️ ')+(standalone?'פתוח כאפליקציה (ממסך הבית)':'פתוח בדפדפן (לא ממסך הבית)'));
+  let sub=null,reg=null;
+  try{reg=await navigator.serviceWorker.ready;ok(!!reg.active,'שירות ההתראות פעיל (service worker)');sub=await reg.pushManager.getSubscription();
+    ok(!!sub,'המכשיר רשום לקבלת התראות'+(sub?' ('+new URL(sub.endpoint).hostname+')':''))}catch(e){ok(false,'שירות ההתראות לא זמין: '+(e.message||e))}
+  ok(!!token,'מחובר: '+(myName||'?')+(adminTok?' (מנהל)':''));
+  if(sub&&token){try{const r=await fetch('/api/subscribe',{method:'POST',headers:hdr(),body:JSON.stringify(sub)});ok(r.ok,'הרישום נשמר בשרת');
+      const t=await fetch('/api/subscribe',{method:'POST',headers:hdr(),body:JSON.stringify({test:true,endpoint:sub.endpoint})});const d=await t.json().catch(()=>({}));
+      ok(t.ok,'השרת שלח התראת בדיקה'+(t.ok?' – אמורה להופיע עכשיו':': '+(d.error||t.status)))}catch(e){ok(false,'שגיאת רשת: '+(e.message||e))}}
+  if(perm==='granted'&&reg){try{await reg.showNotification('בדיקה מקומית 🔔',{body:'אם ראית את זה – התצוגה במכשיר תקינה',icon:'icons/icon-192.png',tag:'bny-local-test'});L.push('ℹ️ נשלחה גם התראה מקומית מהמכשיר עצמו')}catch(e){ok(false,'התראה מקומית נכשלה: '+(e.message||e))}}
+  sheet('🩺 בדיקת התראות',`<div style="line-height:1.9;font-size:15px;text-align:right">${L.map(esc).join('<br>')}</div><p class="mut" style="margin-top:12px;font-size:12px">אם מופיע ✅ בכל השורות אבל לא קפצה התראה – הבעיה בהגדרות הטלפון (התראות של האפליקציה/הדפדפן, חיסכון בסוללה, "נא לא להפריע").</p>`);
+}
