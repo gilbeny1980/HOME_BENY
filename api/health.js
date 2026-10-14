@@ -1,5 +1,5 @@
 // Diagnostics: shows which environment variables are set (never their values).
-const { subCount, getJSON } = require('./_lib');
+const { subCount, getJSON, subsAll } = require('./_lib');
 module.exports = async (req, res) => {
   const e = process.env, has = k => !!e[k];
   res.status(200).json({
@@ -10,6 +10,8 @@ module.exports = async (req, res) => {
     VAPID_PUBLIC_KEY_length: (e.VAPID_PUBLIC_KEY || '').length, VAPID_PRIVATE_KEY_length: (e.VAPID_PRIVATE_KEY || '').length,
     VAPID_PRIVATE_KEY_valid_chars: /^[A-Za-z0-9_-]*$/.test(e.VAPID_PRIVATE_KEY || ''), VAPID_PUBLIC_KEY_valid_chars: /^[A-Za-z0-9_-]*$/.test(e.VAPID_PUBLIC_KEY || ''),
     cronCalls: await getJSON('bny:cronlog').then(l => (l || []).map(x => ({ agoMin: Math.round((Date.now() - x.t) / 60000), ua: x.ua }))).catch(() => null),
+    subsByUser: await subsAll().then(l => l.reduce((o, s) => (o[s.uname || '?'] = (o[s.uname || '?'] || 0) + 1, o), {})).catch(() => null),
+    sendLog: await getJSON('bny:sendlog').then(l => (l || []).map(x => ({ agoMin: Math.round((Date.now() - x.t) / 60000), to: x.msgs, sent: x.sent, fails: x.fails }))).catch(() => null),
     subscriptions: await subCount().catch(() => -1),
     env: e.VERCEL_ENV || null,
   });

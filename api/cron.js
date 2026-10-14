@@ -54,10 +54,11 @@ module.exports = async (req, res) => {
     }
     const subs = await subsAll();
     let sent = 0;
+    const fails = [];
     for (const m of msgs) for (const { sub, uname } of subs) {
       if (m.to && uname && uname !== 'admin' && !m.to.includes(uname)) continue;
       try { await webpush.sendNotification(sub, JSON.stringify({ title: m.title, body: m.body, eid: m.eid || '', at: m.at || 0 })); sent++; }
-      catch (err) { if (err.statusCode === 404 || err.statusCode === 410) await subDel(sub.endpoint); }
+      catch (err) { fails.push(err.statusCode || String(err.message || err).slice(0, 40)); if (err.statusCode === 404 || err.statusCode === 410) await subDel(sub.endpoint); }
     }
     // due snoozes go back only to the device that asked
     for (const s of await snoozesDue(now)) {
@@ -66,6 +67,11 @@ module.exports = async (req, res) => {
       if (!sub) continue;
       try { await webpush.sendNotification(sub, JSON.stringify({ title: '⏰ ' + s.title, body: s.body, eid: s.eid, at: Number(s.at) })); sent++; }
       catch (err) { if (err.statusCode === 404 || err.statusCode === 410) await subDel(s.endpoint); }
+    }
+    if (msgs.length || fails.length) { // diagnostics only: counts and error codes, no event text
+      const sl = ((await getJSON('bny:sendlog')) || []).slice(-9);
+      sl.push({ t: Date.now(), msgs: msgs.map(m => (m.to ? m.to.join('+') : 'all')), sent, fails });
+      await setJSON('bny:sendlog', sl);
     }
     res.status(200).json({ messages: msgs.length, sent });
   } catch (e) { res.status(500).json({ error: String(e.message || e) }); }
