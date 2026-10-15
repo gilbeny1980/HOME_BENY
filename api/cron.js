@@ -31,19 +31,19 @@ module.exports = async (req, res) => {
       const nag = Number(e.nag) > 0 ? Number(e.nag) : 0, needsDone = !!e.req;
       for (const date of REC.occDates(e, toDate)) {
         const at = REC.ilToMs(date, e.time), fire = at - e.remind * 60000;
-        if (now < fire || now >= at + (needsDone ? 48 * 3600000 : 3600000)) continue;
+        if (now < fire || now >= at + (needsDone ? 48 * 3600000 : nag ? 6 * 3600000 : 3600000)) continue;
         const title = 'תזכורת: ' + e.title + (kids.length ? ` (${kids.join(', ')})` : ''), body = `${date} בשעה ${e.time}`, to = recipients(kids);
         const first = await markFired(`${e.id}:${at}`);
         if (first) msgs.push({ title, body, to, eid: e.id, at, req: needsDone });
         if (needsDone) {
           // keeps going (parents only) every `nag` minutes (default 10) until a parent confirms "done"
           if (!first && !(await wasFired(`done:${e.id}:${at}`))) {
-            const every = (nag || 10) * 60000, k = Math.floor((now - fire) / every);
+            const every = (nag || 2) * 60000, k = Math.floor((now - fire) / every);
             if (k >= 1 && k <= 400 && await markFired(`${e.id}:${at}:r${k}`)) msgs.push({ title: '❗ ממתין לאישור: ' + e.title + (kids.length ? ` (${kids.join(', ')})` : ''), body, to: parents, eid: e.id, at, req: true });
           }
         } else if (nag && !first && !(await wasFired(`ack:${e.id}:${at}`))) {
-          // repeat every `nag` minutes (up to 5 times) until someone taps "got it" or snoozes
-          const k = Math.min(5, Math.floor((now - fire) / (nag * 60000)));
+          // repeat every `nag` minutes (up to 30 times) until someone taps "got it" or snoozes
+          const k = Math.min(30, Math.floor((now - fire) / (nag * 60000)));
           if (k >= 1) {
             for (let j = 1; j < k; j++) await markFired(`${e.id}:${at}:n${j}`);
             if (await markFired(`${e.id}:${at}:n${k}`)) msgs.push({ title: '🔁 ' + title, body, to, eid: e.id, at });
