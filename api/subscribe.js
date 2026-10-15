@@ -1,7 +1,16 @@
 const webpush = require('web-push');
-const { subPut, subGet, auth, ntfyTopic, ntfyPublish } = require('./_lib');
+const { subPut, subGet, auth, ntfyTopic, ntfyPublish, tg, tgConfigured, tgChats, tgBotName, tgNewCode, tgPoll } = require('./_lib');
 module.exports = async (req, res) => {
   if (!(await auth(req, res))) return;
+  if (req.method === 'GET' && req.query && req.query.tg) { // Telegram: is it set up, am I linked, my personal /start link
+    try {
+      if (!tgConfigured()) return res.status(200).json({ configured: false });
+      await tgPoll().catch(() => {}); // pick up a fresh /start right away
+      const linked = !!(await tgChats())[req.session.uname];
+      const bot = await tgBotName();
+      return res.status(200).json({ configured: true, linked, link: linked ? null : `https://t.me/${bot}?start=${await tgNewCode(req.session.uname)}`, bot });
+    } catch (e) { return res.status(500).json({ error: String(e.message || e) }); }
+  }
   if (req.method === 'GET' && req.query && req.query.ntfy) { // my private ntfy topic (created on first request)
     try { return res.status(200).json({ topic: await ntfyTopic(req.session.uname, true), server: 'ntfy.sh' }); }
     catch (e) { return res.status(500).json({ error: String(e.message || e) }); }
@@ -9,6 +18,12 @@ module.exports = async (req, res) => {
   if (req.method === 'GET') return res.status(200).json({ key: String(process.env.VAPID_PUBLIC_KEY || '').replace(/[^A-Za-z0-9_-]/g, '') });
   try {
     const sub = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    if (sub && sub.tgTest) {
+      const chat = (await tgChats())[req.session.uname];
+      if (!chat) return res.status(404).json({ error: 'not linked' });
+      try { await tg('sendMessage', { chat_id: chat, text: '🔔 בדיקת התראה – אם ראית את זה על המסך, הטלגרם מוגדר נכון ✔' }); return res.status(200).json({ ok: true }); }
+      catch (e) { return res.status(502).json({ error: String(e.message || e) }); }
+    }
     if (sub && sub.ntfyTest) { // test urgent notification to my ntfy topic
       const topic = await ntfyTopic(req.session.uname, false);
       if (!topic) return res.status(404).json({ error: 'no topic yet' });

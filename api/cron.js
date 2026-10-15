@@ -1,5 +1,5 @@
 const webpush = require('web-push');
-const { markFired, wasFired, subsAll, subDel, subGet, snoozesDue, snoozeDel, getJSON, setJSON, getUsers, ntfyTopics, ntfyPublish } = require('./_lib');
+const { markFired, wasFired, subsAll, subDel, subGet, snoozesDue, snoozeDel, getJSON, setJSON, getUsers, ntfyTopics, ntfyPublish, tg, tgConfigured, tgChats, tgPoll } = require('./_lib');
 const REC = require('../rec.js');
 // Called every 5 minutes by GitHub Actions. Public on purpose: it only sends reminders that are already due,
 // and each reminder is sent once (markFired), so calling it extra times is harmless.
@@ -66,6 +66,19 @@ module.exports = async (req, res) => {
       if (m.to && uname && uname !== 'admin' && !m.to.includes(uname)) continue;
       try { await webpush.sendNotification(sub, JSON.stringify({ title: m.title, body: m.body, eid: m.eid || '', at: m.at || 0, req: !!m.req && (!uname || uname === 'admin' || parents.includes(uname)) })); sent++; }
       catch (err) { fails.push(err.statusCode || String(err.message || err).slice(0, 40)); if (err.statusCode === 404 || err.statusCode === 410) await subDel(sub.endpoint); }
+    }
+    // Telegram: handle new /start links + button presses, then send the reminders (with action buttons)
+    if (tgConfigured()) {
+      try { await tgPoll(); } catch (err) { fails.push('tgpoll'); }
+      const chats = await tgChats();
+      for (const m of msgs) for (const u of Object.keys(chats)) {
+        if (m.to && u !== 'admin' && !m.to.includes(u)) continue;
+        const confirmer = u === 'admin' || parents.includes(u);
+        const kb = !m.eid ? [] : (m.req && confirmer)
+          ? [[{ text: '✔ בוצע', callback_data: `d:${m.eid}:${m.at}` }, { text: '⏰ נודניק 10 דק׳', callback_data: `p:${m.eid}:${m.at}` }]]
+          : [[{ text: '✔ הבנתי', callback_data: `k:${m.eid}:${m.at}` }]];
+        try { await tg('sendMessage', { chat_id: chats[u], text: `🔔 ${m.title}\n${m.body}`, disable_notification: false, reply_markup: { inline_keyboard: kb } }); sent++; } catch (err) { fails.push('tg'); }
+      }
     }
     // urgent notifications through ntfy (only for people who set it up): max priority, with action buttons
     let nsent = 0;

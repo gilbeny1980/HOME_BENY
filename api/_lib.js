@@ -47,6 +47,54 @@ async function ntfyPublish(msg) {
   const r = await fetch('https://ntfy.sh/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ priority: 5, tags: ['bell'], ...msg }) });
   if (!r.ok) throw new Error('ntfy ' + r.status);
 }
+// ---- Telegram bot (heads-up message notifications on the phone): people link their chat via a /start code ----
+const TGAPI = m => `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/${m}`;
+async function tg(method, body) {
+  const r = await fetch(TGAPI(method), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+  const j = await r.json().catch(() => ({}));
+  if (!j.ok) throw new Error(j.description || ('telegram ' + r.status));
+  return j.result;
+}
+const tgConfigured = () => !!process.env.TELEGRAM_BOT_TOKEN;
+const tgChats = async () => (await getJSON('bny:tg')) || {};
+async function tgBotName() { const c = await getJSON('bny:tgbot'); if (c) return c; const me = await tg('getMe'); await setJSON('bny:tgbot', me.username); return me.username; }
+async function tgNewCode(uname) {
+  const codes = (await getJSON('bny:tgcodes')) || {}, now = Date.now();
+  for (const k of Object.keys(codes)) if (now - codes[k].t > 3600000) delete codes[k];
+  const code = crypto.randomBytes(6).toString('hex'); codes[code] = { u: uname, t: now };
+  await setJSON('bny:tgcodes', codes); return code;
+}
+// reads new messages sent to the bot: "/start <code>" links a person; button presses confirm / snooze
+async function tgPoll() {
+  if (!tgConfigured()) return;
+  const off = Number(await getJSON('bny:tgoffset')) || 0;
+  const ups = await tg('getUpdates', { offset: off, timeout: 0, allowed_updates: ['message', 'callback_query'] });
+  if (!ups.length) return;
+  await setJSON('bny:tgoffset', ups[ups.length - 1].update_id + 1);
+  for (const u of ups) {
+    try {
+      if (u.message && u.message.text && u.message.text.startsWith('/start')) {
+        const code = u.message.text.split(' ')[1], codes = (await getJSON('bny:tgcodes')) || {}, chat = u.message.chat.id;
+        if (code && codes[code]) {
+          const chats = await tgChats(); chats[codes[code].u] = chat; await setJSON('bny:tg', chats); delete codes[code]; await setJSON('bny:tgcodes', codes);
+          const un = (await getUsers()).find(x => x.u === Object.keys(chats).find(k => chats[k] === chat));
+          await tg('sendMessage', { chat_id: chat, text: `✅ מחובר${un ? ' – שלום ' + un.n : ''}! מעכשיו התזכורות של משפחת בן יהודה יגיעו לכאן.` });
+        } else await tg('sendMessage', { chat_id: chat, text: 'כדי להתחבר פתחו את אפליקציית בן יהודה ← הכפתור עם השם ← "התראות בטלגרם".' });
+      } else if (u.callback_query) {
+        const cq = u.callback_query, [k, eid, at] = String(cq.data || '').split(':'), chats = await tgChats();
+        const uname = Object.keys(chats).find(x => chats[x] === cq.from.id);
+        if (!uname) { await tg('answerCallbackQuery', { callback_query_id: cq.id, text: 'לא מחובר' }); continue; }
+        let text = 'נרשם ✔';
+        if (k === 'k') await markFired(`ack:${eid}:${at}`);
+        else if (!(await canConfirm(uname, false))) text = 'רק גיל או אדוה יכולים לאשר';
+        else if (k === 'd') { await markFired(`done:${eid}:${at}`); text = 'אושר ✔ – ההתראות נפסקו'; }
+        else if (k === 'p') { await setJSON(`bny:pause:${eid}:${at}`, Date.now() + 10 * 60000); text = 'נודניק 10 דקות ⏰'; }
+        await tg('answerCallbackQuery', { callback_query_id: cq.id, text });
+        if (cq.message && text !== 'רק גיל או אדוה יכולים לאשר') await tg('editMessageReplyMarkup', { chat_id: cq.message.chat.id, message_id: cq.message.message_id, reply_markup: { inline_keyboard: [] } }).catch(() => {});
+      }
+    } catch (e) { /* ignore a single bad update */ }
+  }
+}
 const subDel = endpoint => exec('DELETE FROM subs WHERE endpoint = ?', [endpoint]);
 // true only the first time a key is marked (prevents duplicate reminders)
 const markFired = async k => (await exec('INSERT OR IGNORE INTO fired (k) VALUES (?)', [k])).rowsAffected > 0;
@@ -106,4 +154,4 @@ async function setPassword(pw) {
   await exec("DELETE FROM sess WHERE role = 'user'"); // everyone must log in again with the new password
 }
 
-module.exports = { ntfyTopics, ntfyTopic, ntfyUserByTopic, ntfyPublish, subUname, canConfirm, snoozeAdd, snoozesDue, snoozeDel, wasFired, subGet, subCount, exec, sha, isAdmin, newSession, getSession, getUsers, checkPassword, setPassword, subPut, subsAll, subDel, markFired, getJSON, setJSON, merge, auth };
+module.exports = { tg, tgConfigured, tgChats, tgBotName, tgNewCode, tgPoll, ntfyTopics, ntfyTopic, ntfyUserByTopic, ntfyPublish, subUname, canConfirm, snoozeAdd, snoozesDue, snoozeDel, wasFired, subGet, subCount, exec, sha, isAdmin, newSession, getSession, getUsers, checkPassword, setPassword, subPut, subsAll, subDel, markFired, getJSON, setJSON, merge, auth };

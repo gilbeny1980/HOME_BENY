@@ -286,8 +286,8 @@ $('#loginFormMain').onsubmit=async e=>{e.preventDefault();const f=Object.fromEnt
 $('#mgrBtn').onclick=async()=>{if(await requestOtp())$('#loginOtp').hidden=false};
 $('#loginOtp').onsubmit=async e=>{e.preventDefault();const t=await verifyOtp(e.target.code.value);if(!t)return;
   adminTok=t.token;localStorage.setItem('bny-admin',adminTok);e.target.reset();e.target.hidden=true;renderAdmin();loggedIn(t.token,'מנהל')};
-$('#meBtn').onclick=()=>{sheet(myName||'משתמש',`<label class="lbl">🎵 צלצול התראה (כשהאפליקציה פתוחה)</label><div class="row" style="margin-bottom:10px"><select id="toneSel">${Object.entries(TONES).map(([k,v])=>`<option value="${k}" ${k===tone?'selected':''}>${v[0]}</option>`).join('')}</select><button class="btn" id="toneTry" style="flex:none">▶ השמע</button></div><label class="lbl" style="flex-direction:row;gap:8px;align-items:center;margin-bottom:10px;color:var(--text)"><input type="checkbox" id="loopChk" ${localStorage.getItem('bny-loop')!=='0'?'checked':''} style="width:auto"> צלצול מתמשך עד שלוחצים "הבנתי"</label><label class="lbl" style="margin-bottom:10px">🔊 עוצמת הצלצול<input type="range" id="volRange" min="20" max="100" step="10" value="${Math.round(vol*100)}" style="padding:0"></label><p class="mut" style="margin-bottom:10px;font-size:12px">כשהאפליקציה סגורה, הצליל נקבע בהגדרות ההתראות של הטלפון.</p><button class="act" id="testPush">🔔 שלח לי התראת בדיקה</button><button class="act" id="popBtn">📱 איך גורמים להתראה לקפוץ על המסך</button><button class="act" id="ntfyBtn">📲 התראות דחופות – קופצות על המסך (ntfy)</button><button class="act" id="diagBtn">🩺 בדיקת התראות במכשיר</button><button class="act" id="logoutBtn">🚪 התנתק</button>`);
-  $('#volRange').onchange=e=>{vol=e.target.value/100;localStorage.setItem('bny-vol',String(vol));playTone(tone)};$('#testPush').onclick=testPush;$('#diagBtn').onclick=diagnose;$('#ntfyBtn').onclick=ntfySetup;$('#popBtn').onclick=popHelp;$('#loopChk').onchange=e=>localStorage.setItem('bny-loop',e.target.checked?'1':'0');$('#toneSel').onchange=e=>{tone=e.target.value;localStorage.setItem('bny-tone',tone);playTone(tone)};$('#toneTry').onclick=()=>playTone($('#toneSel').value);$('#logoutBtn').onclick=()=>{$('#sheet').hidden=true;logout()}};
+$('#meBtn').onclick=()=>{sheet(myName||'משתמש',`<label class="lbl">🎵 צלצול התראה (כשהאפליקציה פתוחה)</label><div class="row" style="margin-bottom:10px"><select id="toneSel">${Object.entries(TONES).map(([k,v])=>`<option value="${k}" ${k===tone?'selected':''}>${v[0]}</option>`).join('')}</select><button class="btn" id="toneTry" style="flex:none">▶ השמע</button></div><label class="lbl" style="flex-direction:row;gap:8px;align-items:center;margin-bottom:10px;color:var(--text)"><input type="checkbox" id="loopChk" ${localStorage.getItem('bny-loop')!=='0'?'checked':''} style="width:auto"> צלצול מתמשך עד שלוחצים "הבנתי"</label><label class="lbl" style="margin-bottom:10px">🔊 עוצמת הצלצול<input type="range" id="volRange" min="20" max="100" step="10" value="${Math.round(vol*100)}" style="padding:0"></label><p class="mut" style="margin-bottom:10px;font-size:12px">כשהאפליקציה סגורה, הצליל נקבע בהגדרות ההתראות של הטלפון.</p><button class="act" id="testPush">🔔 שלח לי התראת בדיקה</button><button class="act" id="tgBtn">✈️ התראות בטלגרם – קופצות כמו הודעה</button><button class="act" id="popBtn">📱 איך גורמים להתראה לקפוץ על המסך</button><button class="act" id="ntfyBtn">📲 התראות דחופות – קופצות על המסך (ntfy)</button><button class="act" id="diagBtn">🩺 בדיקת התראות במכשיר</button><button class="act" id="logoutBtn">🚪 התנתק</button>`);
+  $('#volRange').onchange=e=>{vol=e.target.value/100;localStorage.setItem('bny-vol',String(vol));playTone(tone)};$('#testPush').onclick=testPush;$('#diagBtn').onclick=diagnose;$('#ntfyBtn').onclick=ntfySetup;$('#popBtn').onclick=popHelp;$('#tgBtn').onclick=tgSetup;$('#loopChk').onchange=e=>localStorage.setItem('bny-loop',e.target.checked?'1':'0');$('#toneSel').onchange=e=>{tone=e.target.value;localStorage.setItem('bny-tone',tone);playTone(tone)};$('#toneTry').onclick=()=>playTone($('#toneSel').value);$('#logoutBtn').onclick=()=>{$('#sheet').hidden=true;logout()}};
 function renderAll(){renderToday();renderKids();renderAdmin();renderCal();renderContacts()}
 renderAll();renderMe();updNotifBtn();checkReminders();sync();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
@@ -488,4 +488,31 @@ function popHelp(){
     <p class="mut" style="font-size:12px;margin:8px 0">הדרך האמינה ביותר: אפליקציית <b>ntfy</b>. התראות בעדיפות מקסימלית שלה קופצות על המסך כברירת מחדל, ויש עליהן כפתורי בוצע / נודניק.</p>
     <button class="btn" id="popNtfy" type="button">📲 הגדר ntfy</button>`);
   $('#popNtfy').onclick=ntfySetup;
+}
+
+// טלגרם: התראה כהודעה רגילה (קופצת על המסך), עם כפתורי בוצע / נודניק
+async function tgSetup(){
+  let d;try{const r=await fetch('/api/subscribe?tg=1',{headers:hdr()});d=await r.json();if(!r.ok)throw 0}catch{return toast('שגיאה בחיבור לשרת')}
+  if(!d.configured){
+    return sheet('✈️ התראות בטלגרם – הגדרה חד־פעמית (מנהל)',`
+      <ol class="steps">
+        <li>בטלגרם חפש את <b>@BotFather</b> ושלח לו <b>/newbot</b>. בחר שם ושם משתמש לבוט (למשל <b>BenYehudaFamilyBot</b>).</li>
+        <li>הוא ישלח לך <b>טוקן</b> (מחרוזת ארוכה). העתק אותו.</li>
+        <li>ב־Vercel: Settings ← Environment Variables ← הוסף <b dir="ltr">TELEGRAM_BOT_TOKEN</b> עם הטוקן ← <b>Redeploy</b>.</li>
+        <li>חזור לכאן ולחץ שוב על "התראות בטלגרם".</li>
+      </ol>`);
+  }
+  if(d.linked){
+    sheet('✈️ טלגרם מחובר ✅',`<p class="mut" style="margin-bottom:10px">התזכורות שלך מגיעות גם לטלגרם, עם כפתורי "בוצע" / "נודניק".</p>
+      <button class="btn" id="tgTest" type="button">🔔 שלח הודעת בדיקה</button>
+      <p class="mut" style="font-size:12px;margin-top:10px">כדי שהיא תקפוץ על המסך: בטלגרם ← הגדרות ← התראות וצלילים ← הפעל "התראות" ו"תצוגה מקדימה", ובהגדרות הטלפון ← אפליקציות ← Telegram ← התראות ← "התראה" + חלון קופץ.</p>`);
+    $('#tgTest').onclick=async()=>{try{const r=await fetch('/api/subscribe',{method:'POST',headers:hdr(),body:JSON.stringify({tgTest:true})});toast(r.ok?'נשלחה בדיקה – בדוק בטלגרם':'השליחה נכשלה')}catch{toast('אין חיבור לשרת')}};
+  }else{
+    sheet('✈️ התראות בטלגרם',`<ol class="steps">
+        <li>לחץ על הכפתור כדי לפתוח את הבוט בטלגרם:<br><a class="miniWa" style="background:#2aabee" href="${esc(d.link)}" target="_blank" rel="noopener">✈️ פתח בטלגרם</a></li>
+        <li>בטלגרם לחץ <b>Start</b> (התחל).</li>
+        <li>חזור לכאן ולחץ:<br><button class="btn" id="tgCheck" type="button" style="margin-top:6px">בדקתי – בדוק חיבור</button></li>
+      </ol>`);
+    $('#tgCheck').onclick=tgSetup;
+  }
 }
