@@ -135,34 +135,21 @@ $('#eventList').onclick=e=>{const im=e.target.closest('.evImg');if(im)return sho
 
 // reminders (שרת-פוש חיצוני אינו נדרש: התראות מקומיות בכל מכשיר שבו האפליקציה מותקנת)
 // צלילי התראה לבחירה (מושמעים כשהאפליקציה פתוחה; כשהיא סגורה הצליל נקבע בהגדרות הטלפון)
-const BELL=[[1,1],[2.76,.28],[5.4,.1]],PLUCK=[[1,1],[2,.35],[3,.15]],PURE=[[1,1],[2,.12]];
-// [שם, תווים[תדר,התחלה,אורך], צורת גל, הרמוניות, עוצמה]
+// צליל התראה: צליל הודעה מודרני ועדין (שלושה צלילים עולים, קצת "זכוכית" והד קצר)
+const GLASS=[[1,1],[2,.28],[3,.1],[4.1,.04]];
 const TONES={
-  sms:['הודעה – כמו SMS 💬',[[1319,0,.16],[1568,.17,.45]],'sine',[[1,1],[2,.5],[3,.25]],.45],
-  sms2:['הודעה כפולה 💬💬',[[1319,0,.12],[1568,.14,.12],[1319,.4,.12],[1568,.54,.4]],'sine',[[1,1],[2,.5],[3,.25]],.45],
-  beep:['ביפ ביפ ביפ 📟',[[1500,0,.1],[1500,.18,.1],[1500,.36,.3]],'square',[[1,1]],.3],
-  chime:['פעמוני קסם ✨',[[1046,0,1.1],[1318,.13,1.1],[1568,.26,1.1],[2093,.39,1.4]],'sine',BELL,.22],
-  harp:['נבל 🎶',[[523,0,.9],[659,.09,.9],[784,.18,.9],[1046,.27,.9],[1318,.36,.9],[1568,.45,1.2]],'triangle',PLUCK,.24],
-  crystal:['קריסטל 💎',[[2093,0,1.2],[1568,.16,1.2],[2637,.32,1.5]],'sine',BELL,.18],
-  lullaby:['ערש 🌙',[[784,0,.6],[659,.34,.6],[784,.68,.6],[659,1.02,.6],[523,1.36,1.1]],'sine',PURE,.26],
-  happy:['שמח 😀',[[523,0,.25],[659,.1,.25],[784,.2,.25],[1046,.3,.3],[784,.52,.25],[1046,.62,.5]],'triangle',PLUCK,.24],
-  marimba:['מרימבה 🥁',[[659,0,.28],[784,.14,.28],[1046,.28,.28],[1318,.42,.4]],'sine',[[1,1],[4,.2]],.3],
-  drops:['טיפות 💧',[[1568,0,.35],[1318,.28,.35],[1046,.56,.35],[1760,.95,.5]],'sine',PURE,.26],
-  bell:['פעמון',[[1318,0,.5],[1046,.35,.5],[1318,.7,.6]],'triangle',PURE,.28],
-  classic:['צלצול קלאסי',[[880,0,.28],[1175,.18,.28],[1568,.36,.4]],'sine',PURE,.3],
-  soft:['עדין',[[523,0,.5],[659,.3,.5],[784,.6,.7]],'sine',PURE,.26],
-  digital:['דיגיטלי',[[1000,0,.14],[1000,.15,.14],[1000,.3,.14],[1500,.45,.3]],'square',[[1,1]],.12],
-  alarm:['אזעקה',[[900,0,.2],[600,.2,.2],[900,.4,.2],[600,.6,.2],[900,.8,.3]],'sawtooth',[[1,1]],.14],
-  silent:['שקט (בלי צליל)',[],'sine',[[1,1]],0],
-  urgent:['דחוף',[[880,0,.24],[1175,.25,.24],[880,.5,.24],[1175,.75,.24],[880,1,.24],[1175,1.25,.24]],'square',[[1,1],[2,.35]],.3]
+  msg:['הודעה חדשה ✨',[[659,0,.55],[988,.11,.6],[1319,.24,1.1]],'sine',GLASS,.34,true],
+  silent:['שקט (בלי צליל)',[],'sine',[[1,1]],0]
 };
-let tone=localStorage.getItem('bny-tone');if(!TONES[tone])tone='sms';
+let tone=localStorage.getItem('bny-tone');if(!TONES[tone])tone='msg';
 let AC;function ctx(){AC=AC||new (window.AudioContext||window.webkitAudioContext)();if(AC.state==='suspended')AC.resume();return AC}
 ['pointerdown','touchstart','keydown'].forEach(ev=>addEventListener(ev,()=>{try{ctx()}catch{}},{once:true,passive:true}));
 let vol=parseFloat(localStorage.getItem('bny-vol')||'1');if(!(vol>0&&vol<=1))vol=1;
 function playTone(name){try{const t=TONES[name]||TONES.chime;if(!t[1].length)return;
   const c=ctx(),master=c.createGain(),comp=c.createDynamicsCompressor();master.gain.value=vol*3;comp.threshold.value=-4;comp.knee.value=0;comp.ratio.value=20;comp.attack.value=0;comp.release.value=.15;master.connect(comp);comp.connect(c.destination);
-  t[1].forEach(([f,at,dur])=>{for(const [mult,amp] of t[3]){const o=c.createOscillator(),g=c.createGain();o.type=t[2];o.frequency.value=f*mult;o.connect(g);g.connect(master);
+  let echo=null;
+  if(t[5]){echo=c.createDelay(.6);echo.delayTime.value=.22;const fb=c.createGain();fb.gain.value=.32;const wet=c.createGain();wet.gain.value=.5;echo.connect(fb);fb.connect(echo);echo.connect(wet);wet.connect(master)}
+  t[1].forEach(([f,at,dur])=>{for(const [mult,amp] of t[3]){const o=c.createOscillator(),g=c.createGain();o.type=t[2];o.frequency.value=f*mult;o.connect(g);g.connect(master);if(echo)g.connect(echo);
     const s=c.currentTime+at,v=Math.min(.95,t[4]*3*amp/(mult>1?1.2:1));g.gain.setValueAtTime(.0001,s);g.gain.exponentialRampToValueAtTime(v,s+.015);g.gain.exponentialRampToValueAtTime(.0001,s+dur);o.start(s);o.stop(s+dur+.05)}})}catch{}}
 function beep(){playTone(tone)}
 async function notify(title,body){
