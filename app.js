@@ -145,7 +145,7 @@ let tone=localStorage.getItem('bny-tone');if(!TONES[tone])tone='msg';
 let AC;function ctx(){AC=AC||new (window.AudioContext||window.webkitAudioContext)();if(AC.state==='suspended')AC.resume();return AC}
 ['pointerdown','touchstart','keydown'].forEach(ev=>addEventListener(ev,()=>{try{ctx()}catch{}},{once:true,passive:true}));
 let vol=parseFloat(localStorage.getItem('bny-vol')||'1');if(!(vol>0&&vol<=1))vol=1;
-function playTone(name){try{const t=TONES[name]||TONES.chime;if(!t[1].length)return;
+function playTone(name){try{const t=TONES[name]||TONES.msg;if(!t[1].length)return;
   const c=ctx(),master=c.createGain(),comp=c.createDynamicsCompressor();master.gain.value=vol*3;comp.threshold.value=-4;comp.knee.value=0;comp.ratio.value=20;comp.attack.value=0;comp.release.value=.15;master.connect(comp);comp.connect(c.destination);
   let echo=null;
   if(t[5]){echo=c.createDelay(.6);echo.delayTime.value=.22;const fb=c.createGain();fb.gain.value=.32;const wet=c.createGain();wet.gain.value=.5;echo.connect(fb);fb.connect(echo);echo.connect(wet);wet.connect(master)}
