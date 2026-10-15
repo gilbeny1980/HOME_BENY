@@ -286,8 +286,8 @@ $('#loginFormMain').onsubmit=async e=>{e.preventDefault();const f=Object.fromEnt
 $('#mgrBtn').onclick=async()=>{if(await requestOtp())$('#loginOtp').hidden=false};
 $('#loginOtp').onsubmit=async e=>{e.preventDefault();const t=await verifyOtp(e.target.code.value);if(!t)return;
   adminTok=t.token;localStorage.setItem('bny-admin',adminTok);e.target.reset();e.target.hidden=true;renderAdmin();loggedIn(t.token,'מנהל')};
-$('#meBtn').onclick=()=>{sheet(myName||'משתמש',`<label class="lbl">🎵 צלצול התראה (כשהאפליקציה פתוחה)</label><div class="row" style="margin-bottom:10px"><select id="toneSel">${Object.entries(TONES).map(([k,v])=>`<option value="${k}" ${k===tone?'selected':''}>${v[0]}</option>`).join('')}</select><button class="btn" id="toneTry" style="flex:none">▶ השמע</button></div><label class="lbl" style="flex-direction:row;gap:8px;align-items:center;margin-bottom:10px;color:var(--text)"><input type="checkbox" id="loopChk" ${localStorage.getItem('bny-loop')!=='0'?'checked':''} style="width:auto"> צלצול מתמשך עד שלוחצים "הבנתי"</label><label class="lbl" style="margin-bottom:10px">🔊 עוצמת הצלצול<input type="range" id="volRange" min="20" max="100" step="10" value="${Math.round(vol*100)}" style="padding:0"></label><p class="mut" style="margin-bottom:10px;font-size:12px">כשהאפליקציה סגורה, הצליל נקבע בהגדרות ההתראות של הטלפון.</p><button class="act" id="testPush">🔔 שלח לי התראת בדיקה</button><button class="act" id="ntfyBtn">📲 התראות דחופות – קופצות על המסך (ntfy)</button><button class="act" id="diagBtn">🩺 בדיקת התראות במכשיר</button><button class="act" id="logoutBtn">🚪 התנתק</button>`);
-  $('#volRange').onchange=e=>{vol=e.target.value/100;localStorage.setItem('bny-vol',String(vol));playTone(tone)};$('#testPush').onclick=testPush;$('#diagBtn').onclick=diagnose;$('#ntfyBtn').onclick=ntfySetup;$('#loopChk').onchange=e=>localStorage.setItem('bny-loop',e.target.checked?'1':'0');$('#toneSel').onchange=e=>{tone=e.target.value;localStorage.setItem('bny-tone',tone);playTone(tone)};$('#toneTry').onclick=()=>playTone($('#toneSel').value);$('#logoutBtn').onclick=()=>{$('#sheet').hidden=true;logout()}};
+$('#meBtn').onclick=()=>{sheet(myName||'משתמש',`<label class="lbl">🎵 צלצול התראה (כשהאפליקציה פתוחה)</label><div class="row" style="margin-bottom:10px"><select id="toneSel">${Object.entries(TONES).map(([k,v])=>`<option value="${k}" ${k===tone?'selected':''}>${v[0]}</option>`).join('')}</select><button class="btn" id="toneTry" style="flex:none">▶ השמע</button></div><label class="lbl" style="flex-direction:row;gap:8px;align-items:center;margin-bottom:10px;color:var(--text)"><input type="checkbox" id="loopChk" ${localStorage.getItem('bny-loop')!=='0'?'checked':''} style="width:auto"> צלצול מתמשך עד שלוחצים "הבנתי"</label><label class="lbl" style="margin-bottom:10px">🔊 עוצמת הצלצול<input type="range" id="volRange" min="20" max="100" step="10" value="${Math.round(vol*100)}" style="padding:0"></label><p class="mut" style="margin-bottom:10px;font-size:12px">כשהאפליקציה סגורה, הצליל נקבע בהגדרות ההתראות של הטלפון.</p><button class="act" id="testPush">🔔 שלח לי התראת בדיקה</button><button class="act" id="popBtn">📱 איך גורמים להתראה לקפוץ על המסך</button><button class="act" id="ntfyBtn">📲 התראות דחופות – קופצות על המסך (ntfy)</button><button class="act" id="diagBtn">🩺 בדיקת התראות במכשיר</button><button class="act" id="logoutBtn">🚪 התנתק</button>`);
+  $('#volRange').onchange=e=>{vol=e.target.value/100;localStorage.setItem('bny-vol',String(vol));playTone(tone)};$('#testPush').onclick=testPush;$('#diagBtn').onclick=diagnose;$('#ntfyBtn').onclick=ntfySetup;$('#popBtn').onclick=popHelp;$('#loopChk').onchange=e=>localStorage.setItem('bny-loop',e.target.checked?'1':'0');$('#toneSel').onchange=e=>{tone=e.target.value;localStorage.setItem('bny-tone',tone);playTone(tone)};$('#toneTry').onclick=()=>playTone($('#toneSel').value);$('#logoutBtn').onclick=()=>{$('#sheet').hidden=true;logout()}};
 function renderAll(){renderToday();renderKids();renderAdmin();renderCal();renderContacts()}
 renderAll();renderMe();updNotifBtn();checkReminders();sync();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
@@ -472,4 +472,20 @@ async function ntfySetup(){
     <p class="mut" style="font-size:12px">מעכשיו כל תזכורת נשלחת גם ל־ntfy בעדיפות הגבוהה ביותר, עם כפתורים "בוצע" / "נודניק" על ההתראה עצמה.</p>`);
   $('#ntfyCopy').onclick=async()=>{try{await navigator.clipboard.writeText(topic);toast('הועתק ✔')}catch{toast('העתק ידנית')}};
   $('#ntfyTest').onclick=async()=>{try{const r=await fetch('/api/subscribe',{method:'POST',headers:hdr(),body:JSON.stringify({ntfyTest:true})});toast(r.ok?'נשלחה בדיקה – בדוק את ntfy':'השליחה נכשלה')}catch{toast('אין חיבור לשרת')}};
+}
+
+// הדרכה: איך לגרום להתראה לקפוץ (Heads-up) על המסך, כולל סמסונג
+function popHelp(){
+  sheet('📱 התראה שקופצת על המסך',`
+    <p class="mut" style="margin-bottom:10px">כשההתראה מופיעה רק כסמל קטן למעלה, הטלפון מגדיר אותה כ"שקטה". אפשר לשנות את זה בהגדרות הטלפון (שמות התפריטים עשויים להיות מעט שונים בכל דגם):</p>
+    <ol class="steps">
+      <li><b>סמסונג:</b> הגדרות ← התראות ← <b>התראות של אפליקציות</b> ← <b>בן יהודה</b> (או Chrome) ← בקטגוריה בחר <b>"התראה" / Alert</b> והפעל <b>"חלון קופץ"</b> (Pop-up).</li>
+      <li>הגדרות ← התראות ← הגדרות מתקדמות ← <b>סגנון חלון קופץ: מפורט</b>.</li>
+      <li><b>מסך נעילה:</b> הגדרות ← מסך נעילה ← התראות ← הצג תוכן.</li>
+      <li><b>סוללה:</b> הגדרות ← סוללה ← מגבלות שימוש ברקע ← <b>אפליקציות שלעולם לא נרדמות</b> ← הוסף את בן יהודה.</li>
+      <li><b>נא לא להפריע:</b> הוסף את האפליקציה כחריג.</li>
+    </ol>
+    <p class="mut" style="font-size:12px;margin:8px 0">הדרך האמינה ביותר: אפליקציית <b>ntfy</b>. התראות בעדיפות מקסימלית שלה קופצות על המסך כברירת מחדל, ויש עליהן כפתורי בוצע / נודניק.</p>
+    <button class="btn" id="popNtfy" type="button">📲 הגדר ntfy</button>`);
+  $('#popNtfy').onclick=ntfySetup;
 }
