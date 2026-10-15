@@ -138,6 +138,9 @@ $('#eventList').onclick=e=>{const im=e.target.closest('.evImg');if(im)return sho
 const BELL=[[1,1],[2.76,.28],[5.4,.1]],PLUCK=[[1,1],[2,.35],[3,.15]],PURE=[[1,1],[2,.12]];
 // [שם, תווים[תדר,התחלה,אורך], צורת גל, הרמוניות, עוצמה]
 const TONES={
+  sms:['הודעה – כמו SMS 💬',[[1319,0,.16],[1568,.17,.45]],'sine',[[1,1],[2,.5],[3,.25]],.45],
+  sms2:['הודעה כפולה 💬💬',[[1319,0,.12],[1568,.14,.12],[1319,.4,.12],[1568,.54,.4]],'sine',[[1,1],[2,.5],[3,.25]],.45],
+  beep:['ביפ ביפ ביפ 📟',[[1500,0,.1],[1500,.18,.1],[1500,.36,.3]],'square',[[1,1]],.3],
   chime:['פעמוני קסם ✨',[[1046,0,1.1],[1318,.13,1.1],[1568,.26,1.1],[2093,.39,1.4]],'sine',BELL,.22],
   harp:['נבל 🎶',[[523,0,.9],[659,.09,.9],[784,.18,.9],[1046,.27,.9],[1318,.36,.9],[1568,.45,1.2]],'triangle',PLUCK,.24],
   crystal:['קריסטל 💎',[[2093,0,1.2],[1568,.16,1.2],[2637,.32,1.5]],'sine',BELL,.18],
@@ -153,12 +156,12 @@ const TONES={
   silent:['שקט (בלי צליל)',[],'sine',[[1,1]],0],
   urgent:['דחוף',[[880,0,.24],[1175,.25,.24],[880,.5,.24],[1175,.75,.24],[880,1,.24],[1175,1.25,.24]],'square',[[1,1],[2,.35]],.3]
 };
-let tone=localStorage.getItem('bny-tone');if(!TONES[tone])tone='chime';
+let tone=localStorage.getItem('bny-tone');if(!TONES[tone])tone='sms';
 let AC;function ctx(){AC=AC||new (window.AudioContext||window.webkitAudioContext)();if(AC.state==='suspended')AC.resume();return AC}
 ['pointerdown','touchstart','keydown'].forEach(ev=>addEventListener(ev,()=>{try{ctx()}catch{}},{once:true,passive:true}));
 let vol=parseFloat(localStorage.getItem('bny-vol')||'1');if(!(vol>0&&vol<=1))vol=1;
 function playTone(name){try{const t=TONES[name]||TONES.chime;if(!t[1].length)return;
-  const c=ctx(),master=c.createGain(),comp=c.createDynamicsCompressor();master.gain.value=vol*2.2;comp.threshold.value=-4;comp.knee.value=0;comp.ratio.value=20;comp.attack.value=0;comp.release.value=.15;master.connect(comp);comp.connect(c.destination);
+  const c=ctx(),master=c.createGain(),comp=c.createDynamicsCompressor();master.gain.value=vol*3;comp.threshold.value=-4;comp.knee.value=0;comp.ratio.value=20;comp.attack.value=0;comp.release.value=.15;master.connect(comp);comp.connect(c.destination);
   t[1].forEach(([f,at,dur])=>{for(const [mult,amp] of t[3]){const o=c.createOscillator(),g=c.createGain();o.type=t[2];o.frequency.value=f*mult;o.connect(g);g.connect(master);
     const s=c.currentTime+at,v=Math.min(.95,t[4]*3*amp/(mult>1?1.2:1));g.gain.setValueAtTime(.0001,s);g.gain.exponentialRampToValueAtTime(v,s+.015);g.gain.exponentialRampToValueAtTime(.0001,s+dur);o.start(s);o.stop(s+dur+.05)}})}catch{}}
 function beep(){playTone(tone)}
@@ -296,7 +299,7 @@ $('#loginFormMain').onsubmit=async e=>{e.preventDefault();const f=Object.fromEnt
 $('#mgrBtn').onclick=async()=>{if(await requestOtp())$('#loginOtp').hidden=false};
 $('#loginOtp').onsubmit=async e=>{e.preventDefault();const t=await verifyOtp(e.target.code.value);if(!t)return;
   adminTok=t.token;localStorage.setItem('bny-admin',adminTok);e.target.reset();e.target.hidden=true;renderAdmin();loggedIn(t.token,'מנהל')};
-$('#meBtn').onclick=()=>{sheet(myName||'משתמש',`<label class="lbl">🎵 צלצול התראה (כשהאפליקציה פתוחה)</label><div class="row" style="margin-bottom:10px"><select id="toneSel">${Object.entries(TONES).filter(([k])=>k!=='urgent').map(([k,v])=>`<option value="${k}" ${k===tone?'selected':''}>${v[0]}</option>`).join('')}</select><button class="btn" id="toneTry" style="flex:none">▶ השמע</button></div><label class="lbl" style="flex-direction:row;gap:8px;align-items:center;margin-bottom:10px;color:var(--text)"><input type="checkbox" id="loopChk" ${localStorage.getItem('bny-loop')!=='0'?'checked':''} style="width:auto"> צלצול מתמשך עד שלוחצים "הבנתי"</label><label class="lbl" style="margin-bottom:10px">🔊 עוצמת הצלצול<input type="range" id="volRange" min="20" max="100" step="10" value="${Math.round(vol*100)}" style="padding:0"></label><p class="mut" style="margin-bottom:10px;font-size:12px">כשהאפליקציה סגורה, הצליל נקבע בהגדרות ההתראות של הטלפון.</p><button class="act" id="testPush">🔔 שלח לי התראת בדיקה</button><button class="act" id="diagBtn">🩺 בדיקת התראות במכשיר</button><button class="act" id="logoutBtn">🚪 התנתק</button>`);
+$('#meBtn').onclick=()=>{sheet(myName||'משתמש',`<label class="lbl">🎵 צלצול התראה (כשהאפליקציה פתוחה)</label><div class="row" style="margin-bottom:10px"><select id="toneSel">${Object.entries(TONES).map(([k,v])=>`<option value="${k}" ${k===tone?'selected':''}>${v[0]}</option>`).join('')}</select><button class="btn" id="toneTry" style="flex:none">▶ השמע</button></div><label class="lbl" style="flex-direction:row;gap:8px;align-items:center;margin-bottom:10px;color:var(--text)"><input type="checkbox" id="loopChk" ${localStorage.getItem('bny-loop')!=='0'?'checked':''} style="width:auto"> צלצול מתמשך עד שלוחצים "הבנתי"</label><label class="lbl" style="margin-bottom:10px">🔊 עוצמת הצלצול<input type="range" id="volRange" min="20" max="100" step="10" value="${Math.round(vol*100)}" style="padding:0"></label><p class="mut" style="margin-bottom:10px;font-size:12px">כשהאפליקציה סגורה, הצליל נקבע בהגדרות ההתראות של הטלפון.</p><button class="act" id="testPush">🔔 שלח לי התראת בדיקה</button><button class="act" id="diagBtn">🩺 בדיקת התראות במכשיר</button><button class="act" id="logoutBtn">🚪 התנתק</button>`);
   $('#volRange').onchange=e=>{vol=e.target.value/100;localStorage.setItem('bny-vol',String(vol));playTone(tone)};$('#testPush').onclick=testPush;$('#diagBtn').onclick=diagnose;$('#loopChk').onchange=e=>localStorage.setItem('bny-loop',e.target.checked?'1':'0');$('#toneSel').onchange=e=>{tone=e.target.value;localStorage.setItem('bny-tone',tone);playTone(tone)};$('#toneTry').onclick=()=>playTone($('#toneSel').value);$('#logoutBtn').onclick=()=>{$('#sheet').hidden=true;logout()}};
 function renderAll(){renderToday();renderKids();renderAdmin();renderCal();renderContacts()}
 renderAll();renderMe();updNotifBtn();checkReminders();sync();
@@ -380,7 +383,7 @@ let alarmT=null,alarmAuto=null,alarmR=null;
 function stopRing(){clearInterval(alarmT);clearTimeout(alarmAuto);alarmT=alarmAuto=null;if(navigator.vibrate)navigator.vibrate(0)}
 function showAlarm(r){
   alarmR=r;const conf=!!r.q&&isParent();$('#alarmSnooze').hidden=false;$('#alarmStop').textContent=r.q?(conf?'✔ בוצע – אישרתי':'הבנתי'):'✔ הבנתי – הפסק';$('#alarmTitle').textContent=r.t||'תזכורת';$('#alarmBody').textContent=r.b||'';$('#alarm').hidden=false;
-  stopRing();$('#alarmHint').hidden=!!(AC&&AC.state==='running');$('#alarmHint').style.visibility='visible';const go=()=>{playTone(r.q&&tone!=='silent'?'urgent':tone);if(navigator.vibrate)navigator.vibrate([500,200,500,200,500])};
+  stopRing();$('#alarmHint').hidden=!!(AC&&AC.state==='running');$('#alarmHint').style.visibility='visible';const go=()=>{playTone(tone);if(navigator.vibrate)navigator.vibrate([500,200,500,200,500])};
   go();if(localStorage.getItem('bny-loop')!=='0')alarmT=setInterval(go,3000);
   alarmAuto=setTimeout(stopRing,180000);
 }
