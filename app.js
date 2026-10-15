@@ -150,14 +150,15 @@ const TONES={
   soft:['עדין',[[523,0,.5],[659,.3,.5],[784,.6,.7]],'sine',PURE,.26],
   digital:['דיגיטלי',[[1000,0,.14],[1000,.15,.14],[1000,.3,.14],[1500,.45,.3]],'square',[[1,1]],.12],
   alarm:['אזעקה',[[900,0,.2],[600,.2,.2],[900,.4,.2],[600,.6,.2],[900,.8,.3]],'sawtooth',[[1,1]],.14],
-  silent:['שקט (בלי צליל)',[],'sine',[[1,1]],0]
+  silent:['שקט (בלי צליל)',[],'sine',[[1,1]],0],
+  urgent:['דחוף',[[880,0,.24],[1175,.25,.24],[880,.5,.24],[1175,.75,.24],[880,1,.24],[1175,1.25,.24]],'square',[[1,1],[2,.35]],.3]
 };
 let tone=localStorage.getItem('bny-tone');if(!TONES[tone])tone='chime';
 let AC;function ctx(){AC=AC||new (window.AudioContext||window.webkitAudioContext)();if(AC.state==='suspended')AC.resume();return AC}
 ['pointerdown','touchstart','keydown'].forEach(ev=>addEventListener(ev,()=>{try{ctx()}catch{}},{once:true,passive:true}));
 let vol=parseFloat(localStorage.getItem('bny-vol')||'1');if(!(vol>0&&vol<=1))vol=1;
 function playTone(name){try{const t=TONES[name]||TONES.chime;if(!t[1].length)return;
-  const c=ctx(),master=c.createGain(),comp=c.createDynamicsCompressor();master.gain.value=vol;master.connect(comp);comp.connect(c.destination);
+  const c=ctx(),master=c.createGain(),comp=c.createDynamicsCompressor();master.gain.value=vol*2.2;comp.threshold.value=-4;comp.knee.value=0;comp.ratio.value=20;comp.attack.value=0;comp.release.value=.15;master.connect(comp);comp.connect(c.destination);
   t[1].forEach(([f,at,dur])=>{for(const [mult,amp] of t[3]){const o=c.createOscillator(),g=c.createGain();o.type=t[2];o.frequency.value=f*mult;o.connect(g);g.connect(master);
     const s=c.currentTime+at,v=Math.min(.95,t[4]*3*amp/(mult>1?1.2:1));g.gain.setValueAtTime(.0001,s);g.gain.exponentialRampToValueAtTime(v,s+.015);g.gain.exponentialRampToValueAtTime(.0001,s+dur);o.start(s);o.stop(s+dur+.05)}})}catch{}}
 function beep(){playTone(tone)}
@@ -295,7 +296,7 @@ $('#loginFormMain').onsubmit=async e=>{e.preventDefault();const f=Object.fromEnt
 $('#mgrBtn').onclick=async()=>{if(await requestOtp())$('#loginOtp').hidden=false};
 $('#loginOtp').onsubmit=async e=>{e.preventDefault();const t=await verifyOtp(e.target.code.value);if(!t)return;
   adminTok=t.token;localStorage.setItem('bny-admin',adminTok);e.target.reset();e.target.hidden=true;renderAdmin();loggedIn(t.token,'מנהל')};
-$('#meBtn').onclick=()=>{sheet(myName||'משתמש',`<label class="lbl">🎵 צלצול התראה (כשהאפליקציה פתוחה)</label><div class="row" style="margin-bottom:10px"><select id="toneSel">${Object.entries(TONES).map(([k,v])=>`<option value="${k}" ${k===tone?'selected':''}>${v[0]}</option>`).join('')}</select><button class="btn" id="toneTry" style="flex:none">▶ השמע</button></div><label class="lbl" style="flex-direction:row;gap:8px;align-items:center;margin-bottom:10px;color:var(--text)"><input type="checkbox" id="loopChk" ${localStorage.getItem('bny-loop')!=='0'?'checked':''} style="width:auto"> צלצול מתמשך עד שלוחצים "הבנתי"</label><label class="lbl" style="margin-bottom:10px">🔊 עוצמת הצלצול<input type="range" id="volRange" min="20" max="100" step="10" value="${Math.round(vol*100)}" style="padding:0"></label><p class="mut" style="margin-bottom:10px;font-size:12px">כשהאפליקציה סגורה, הצליל נקבע בהגדרות ההתראות של הטלפון.</p><button class="act" id="testPush">🔔 שלח לי התראת בדיקה</button><button class="act" id="diagBtn">🩺 בדיקת התראות במכשיר</button><button class="act" id="logoutBtn">🚪 התנתק</button>`);
+$('#meBtn').onclick=()=>{sheet(myName||'משתמש',`<label class="lbl">🎵 צלצול התראה (כשהאפליקציה פתוחה)</label><div class="row" style="margin-bottom:10px"><select id="toneSel">${Object.entries(TONES).filter(([k])=>k!=='urgent').map(([k,v])=>`<option value="${k}" ${k===tone?'selected':''}>${v[0]}</option>`).join('')}</select><button class="btn" id="toneTry" style="flex:none">▶ השמע</button></div><label class="lbl" style="flex-direction:row;gap:8px;align-items:center;margin-bottom:10px;color:var(--text)"><input type="checkbox" id="loopChk" ${localStorage.getItem('bny-loop')!=='0'?'checked':''} style="width:auto"> צלצול מתמשך עד שלוחצים "הבנתי"</label><label class="lbl" style="margin-bottom:10px">🔊 עוצמת הצלצול<input type="range" id="volRange" min="20" max="100" step="10" value="${Math.round(vol*100)}" style="padding:0"></label><p class="mut" style="margin-bottom:10px;font-size:12px">כשהאפליקציה סגורה, הצליל נקבע בהגדרות ההתראות של הטלפון.</p><button class="act" id="testPush">🔔 שלח לי התראת בדיקה</button><button class="act" id="diagBtn">🩺 בדיקת התראות במכשיר</button><button class="act" id="logoutBtn">🚪 התנתק</button>`);
   $('#volRange').onchange=e=>{vol=e.target.value/100;localStorage.setItem('bny-vol',String(vol));playTone(tone)};$('#testPush').onclick=testPush;$('#diagBtn').onclick=diagnose;$('#loopChk').onchange=e=>localStorage.setItem('bny-loop',e.target.checked?'1':'0');$('#toneSel').onchange=e=>{tone=e.target.value;localStorage.setItem('bny-tone',tone);playTone(tone)};$('#toneTry').onclick=()=>playTone($('#toneSel').value);$('#logoutBtn').onclick=()=>{$('#sheet').hidden=true;logout()}};
 function renderAll(){renderToday();renderKids();renderAdmin();renderCal();renderContacts()}
 renderAll();renderMe();updNotifBtn();checkReminders();sync();
@@ -341,7 +342,7 @@ function pingCron(){if(Date.now()-lastCron<55000)return;lastCron=Date.now();fetc
 async function snoozeFor(r,min){
   try{const sub=await (await navigator.serviceWorker.ready).pushManager.getSubscription();
     if(!sub){toast('המכשיר לא רשום להתראות');return}
-    const x=await fetch('/api/snooze',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint,minutes:min,title:r.t,body:r.b,eid:r.e,at:r.a})});
+    const x=await fetch('/api/snooze',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint,minutes:min,title:r.t,body:r.b,eid:r.e,at:r.a,req:!!r.q})});
     toast(x.ok?`נודניק – תזכורת בעוד ${min} דק׳ ⏰`:'לא הצלחתי לקבוע נודניק');
   }catch{toast('שגיאה')}$('#sheet').hidden=true}
 function showRemind(r){showAlarm(r)}
@@ -378,15 +379,16 @@ $('#eventModal').onclick=e=>{if(e.target.id==='eventModal')$('#eventModal').hidd
 let alarmT=null,alarmAuto=null,alarmR=null;
 function stopRing(){clearInterval(alarmT);clearTimeout(alarmAuto);alarmT=alarmAuto=null;if(navigator.vibrate)navigator.vibrate(0)}
 function showAlarm(r){
-  alarmR=r;const conf=!!r.q&&isParent();$('#alarmSnooze').hidden=!!r.q;$('#alarmStop').textContent=r.q?(conf?'✔ בוצע – אישרתי':'הבנתי'):'✔ הבנתי – הפסק';$('#alarmTitle').textContent=r.t||'תזכורת';$('#alarmBody').textContent=r.b||'';$('#alarm').hidden=false;
-  stopRing();const go=()=>{playTone(tone);if(navigator.vibrate)navigator.vibrate([500,200,500,200,500])};
+  alarmR=r;const conf=!!r.q&&isParent();$('#alarmSnooze').hidden=false;$('#alarmStop').textContent=r.q?(conf?'✔ בוצע – אישרתי':'הבנתי'):'✔ הבנתי – הפסק';$('#alarmTitle').textContent=r.t||'תזכורת';$('#alarmBody').textContent=r.b||'';$('#alarm').hidden=false;
+  stopRing();$('#alarmHint').hidden=!!(AC&&AC.state==='running');$('#alarmHint').style.visibility='visible';const go=()=>{playTone(r.q&&tone!=='silent'?'urgent':tone);if(navigator.vibrate)navigator.vibrate([500,200,500,200,500])};
   go();if(localStorage.getItem('bny-loop')!=='0')alarmT=setInterval(go,3000);
   alarmAuto=setTimeout(stopRing,180000);
 }
 $('#alarmStop').onclick=()=>{stopRing();$('#alarm').hidden=true;const r=alarmR||{};if(!r.e)return;
   if(r.q){if(isParent())confirmDone(r.e,r.a)}
   else fetch('/api/snooze',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'ack',eid:r.e,at:r.a})}).catch(()=>{})};
-$('#alarmSnooze').onclick=async()=>{stopRing();$('#alarm').hidden=true;const r=alarmR||{};await snoozeFor(r,10);if(!r.e)setTimeout(()=>showAlarm(r),10*60000)};
+$('#alarmSnooze').onclick=async()=>{stopRing();$('#alarm').hidden=true;const r=alarmR||{};if(r.q&&r.e)localStorage.setItem('bny-snz:'+r.e+':'+r.a,String(Date.now()+10*60000));await snoozeFor(r,10);if(!r.e)setTimeout(()=>showAlarm(r),10*60000)};
+$('#alarm').addEventListener('pointerdown',()=>{try{ctx()}catch{};$('#alarmHint').style.visibility='hidden'},{passive:true});
 
 // תמונה לאירוע: מכווצים בדפדפן, מעלים לשרת, ומציגים לפי מזהה
 let pendingImg='',curImg='',origImg='',editEv='';const imgCache=new Map();
@@ -455,5 +457,11 @@ async function loadPending(){
     const d=await r.json();
     if(!d.can||!d.pending.length){box.hidden=true;return}
     $('#pendingList').innerHTML=d.pending.map(p=>`<li class="item" style="--c:${p.kids&&p.kids.length?kidColor(p.kids[0]):'var(--b1)'}"><div class="avatar" style="background:${kidBg(p.kids||[])}">${esc(p.time)}</div><div class="main"><b>${esc(p.title)}${kidTags(p.kids||[])}</b><small>${fmtDate(p.date)}</small></div><button class="btn doneBtn" data-eid="${p.eid}" data-at="${p.at}">✔ בוצע</button></li>`).join('');
-    box.hidden=false}catch{}}
+    box.hidden=false;
+    // parents / manager: open the full-screen alarm (with the snooze button) for the first unconfirmed task
+    if(document.visibilityState==='visible'&&$('#alarm').hidden&&$('#sheet').hidden){
+      const p=d.pending.find(x=>(+localStorage.getItem('bny-snz:'+x.eid+':'+x.at)||0)<=Date.now());
+      if(p)showAlarm({t:'❗ '+p.title+(p.kids&&p.kids.length?' ('+p.kids.join(', ')+')':''),b:fmtDate(p.date)+' בשעה '+p.time,e:p.eid,a:p.at,q:true})}
+  }catch{}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')loadPending()});
 $('#pendingList').onclick=e=>{const b=e.target.closest('.doneBtn');if(b)confirmDone(b.dataset.eid,+b.dataset.at)};

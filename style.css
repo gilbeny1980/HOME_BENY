@@ -147,3 +147,4 @@ summary.btn{list-style:none;text-align:center}summary::-webkit-details-marker{di
 
 .pendingCard{border:2px solid #e5484d;background:linear-gradient(180deg,rgba(229,72,77,.08),transparent)}
 .doneBtn{padding:10px 14px;background:linear-gradient(135deg,#18b37e,#0e8f66);box-shadow:none;white-space:nowrap}
+.alarmHint{background:rgba(0,0,0,.25);border-radius:12px;padding:8px;font-size:15px !important}

@@ -37,7 +37,8 @@ module.exports = async (req, res) => {
         if (first) msgs.push({ title, body, to, eid: e.id, at, req: needsDone });
         if (needsDone) {
           // keeps going (parents only) every `nag` minutes (default 10) until a parent confirms "done"
-          if (!first && !(await wasFired(`done:${e.id}:${at}`))) {
+          const paused = Number(await getJSON(`bny:pause:${e.id}:${at}`)) > now;
+          if (!first && !paused && !(await wasFired(`done:${e.id}:${at}`))) {
             const every = (nag || 2) * 60000, k = Math.floor((now - fire) / every);
             if (k >= 1 && k <= 400 && await markFired(`${e.id}:${at}:r${k}`)) msgs.push({ title: '❗ ממתין לאישור: ' + e.title + (kids.length ? ` (${kids.join(', ')})` : ''), body, to: parents, eid: e.id, at, req: true });
           }

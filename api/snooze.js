@@ -1,4 +1,4 @@
-const { subGet, subUname, canConfirm, snoozeAdd, markFired } = require('./_lib');
+const { subGet, subUname, canConfirm, snoozeAdd, markFired, setJSON } = require('./_lib');
 // Called by the service worker / alarm screen (no login there): the device's own push endpoint is the credential for snooze.
 // action 'ack' = "got it": stops repeat reminders for that occurrence.
 module.exports = async (req, res) => {
@@ -19,6 +19,12 @@ module.exports = async (req, res) => {
     }
     if (!b.endpoint || !(await subGet(b.endpoint))) return res.status(404).json({ error: 'device not registered' });
     const min = Math.min(Math.max(Number(b.minutes) || 10, 1), 24 * 60);
+    if (b.req && b.eid && b.at) { // a task that needs a parent's confirmation: pause the repeat series for a while (it resumes by itself)
+      const un = await subUname(b.endpoint);
+      if (un !== null && !(await canConfirm(un, false))) return res.status(403).json({ error: 'only a parent can snooze' });
+      await setJSON(`bny:pause:${b.eid}:${b.at}`, Date.now() + min * 60000);
+      return res.status(200).json({ ok: true });
+    }
     await snoozeAdd(b.endpoint, Date.now() + min * 60000, String(b.title || 'תזכורת').slice(0, 200), String(b.body || '').slice(0, 300), b.eid, b.at);
     if (b.eid && b.at) await markFired(`ack:${b.eid}:${b.at}`); // snoozing also stops the repeat series
     res.status(200).json({ ok: true });
