@@ -206,6 +206,7 @@ async function sync(){
     enablePush();
     pingCron();
     if(famTick++%10===0)loadFamily();
+    if(famTick===1)linkNative();
     loadPending();
   }catch(e){}finally{syncing=false}
 }
@@ -277,7 +278,7 @@ $('#pwForm').onsubmit=async e=>{e.preventDefault();const d=await usersCall({acti
 function showLogin(){$('#login').hidden=false;$('#meBtn').hidden=true}
 function renderMe(){const b=$('#meBtn');b.hidden=!token;b.textContent='👤 '+(myName||'')}
 function logout(expired){token='';adminTok='';myName='';myUser='';['bny-token','bny-admin','bny-name','bny-user'].forEach(k=>localStorage.removeItem(k));renderAdmin();renderToday();showLogin();if(expired)toast('יש להתחבר מחדש')}
-function loggedIn(t,name,uname){token=t;myName=name;myUser=uname||'admin';localStorage.setItem('bny-token',t);localStorage.setItem('bny-name',name);localStorage.setItem('bny-user',myUser);$('#login').hidden=true;renderMe();renderToday();sync()}
+function loggedIn(t,name,uname){token=t;myName=name;myUser=uname||'admin';setTimeout(linkNative,500);localStorage.setItem('bny-token',t);localStorage.setItem('bny-name',name);localStorage.setItem('bny-user',myUser);$('#login').hidden=true;renderMe();renderToday();sync()}
 $('#loginFormMain').onsubmit=async e=>{e.preventDefault();const f=Object.fromEntries(new FormData(e.target));
   try{const r=await fetch('/api/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(f)});
     if(r.status===429)return toast('יותר מדי ניסיונות, נסה בעוד כמה דקות');
@@ -286,8 +287,8 @@ $('#loginFormMain').onsubmit=async e=>{e.preventDefault();const f=Object.fromEnt
 $('#mgrBtn').onclick=async()=>{if(await requestOtp())$('#loginOtp').hidden=false};
 $('#loginOtp').onsubmit=async e=>{e.preventDefault();const t=await verifyOtp(e.target.code.value);if(!t)return;
   adminTok=t.token;localStorage.setItem('bny-admin',adminTok);e.target.reset();e.target.hidden=true;renderAdmin();loggedIn(t.token,'מנהל')};
-$('#meBtn').onclick=()=>{sheet(myName||'משתמש',`<label class="lbl">🎵 צלצול התראה (כשהאפליקציה פתוחה)</label><div class="row" style="margin-bottom:10px"><select id="toneSel">${Object.entries(TONES).map(([k,v])=>`<option value="${k}" ${k===tone?'selected':''}>${v[0]}</option>`).join('')}</select><button class="btn" id="toneTry" style="flex:none">▶ השמע</button></div><label class="lbl" style="flex-direction:row;gap:8px;align-items:center;margin-bottom:10px;color:var(--text)"><input type="checkbox" id="loopChk" ${localStorage.getItem('bny-loop')!=='0'?'checked':''} style="width:auto"> צלצול מתמשך עד שלוחצים "הבנתי"</label><label class="lbl" style="margin-bottom:10px">🔊 עוצמת הצלצול<input type="range" id="volRange" min="20" max="100" step="10" value="${Math.round(vol*100)}" style="padding:0"></label><p class="mut" style="margin-bottom:10px;font-size:12px">כשהאפליקציה סגורה, הצליל נקבע בהגדרות ההתראות של הטלפון.</p><button class="act" id="testPush">🔔 שלח לי התראת בדיקה</button><button class="act" id="tgBtn">✈️ התראות בטלגרם – קופצות כמו הודעה</button><button class="act" id="popBtn">📱 איך גורמים להתראה לקפוץ על המסך</button><button class="act" id="ntfyBtn">📲 התראות דחופות – קופצות על המסך (ntfy)</button><button class="act" id="diagBtn">🩺 בדיקת התראות במכשיר</button><button class="act" id="logoutBtn">🚪 התנתק</button>`);
-  $('#volRange').onchange=e=>{vol=e.target.value/100;localStorage.setItem('bny-vol',String(vol));playTone(tone)};$('#testPush').onclick=testPush;$('#diagBtn').onclick=diagnose;$('#ntfyBtn').onclick=ntfySetup;$('#popBtn').onclick=popHelp;$('#tgBtn').onclick=tgSetup;$('#loopChk').onchange=e=>localStorage.setItem('bny-loop',e.target.checked?'1':'0');$('#toneSel').onchange=e=>{tone=e.target.value;localStorage.setItem('bny-tone',tone);playTone(tone)};$('#toneTry').onclick=()=>playTone($('#toneSel').value);$('#logoutBtn').onclick=()=>{$('#sheet').hidden=true;logout()}};
+$('#meBtn').onclick=()=>{sheet(myName||'משתמש',`<label class="lbl">🎵 צלצול התראה (כשהאפליקציה פתוחה)</label><div class="row" style="margin-bottom:10px"><select id="toneSel">${Object.entries(TONES).map(([k,v])=>`<option value="${k}" ${k===tone?'selected':''}>${v[0]}</option>`).join('')}</select><button class="btn" id="toneTry" style="flex:none">▶ השמע</button></div><label class="lbl" style="flex-direction:row;gap:8px;align-items:center;margin-bottom:10px;color:var(--text)"><input type="checkbox" id="loopChk" ${localStorage.getItem('bny-loop')!=='0'?'checked':''} style="width:auto"> צלצול מתמשך עד שלוחצים "הבנתי"</label><label class="lbl" style="margin-bottom:10px">🔊 עוצמת הצלצול<input type="range" id="volRange" min="20" max="100" step="10" value="${Math.round(vol*100)}" style="padding:0"></label><p class="mut" style="margin-bottom:10px;font-size:12px">כשהאפליקציה סגורה, הצליל נקבע בהגדרות ההתראות של הטלפון.</p><button class="act" id="testPush">🔔 שלח לי התראת בדיקה</button><button class="act" id="appBtn">📲 אפליקציית אנדרואיד – מסך מלא גם כשסגור</button><button class="act" id="tgBtn">✈️ התראות בטלגרם – קופצות כמו הודעה</button><button class="act" id="popBtn">📱 איך גורמים להתראה לקפוץ על המסך</button><button class="act" id="ntfyBtn">📲 התראות דחופות – קופצות על המסך (ntfy)</button><button class="act" id="diagBtn">🩺 בדיקת התראות במכשיר</button><button class="act" id="logoutBtn">🚪 התנתק</button>`);
+  $('#volRange').onchange=e=>{vol=e.target.value/100;localStorage.setItem('bny-vol',String(vol));playTone(tone)};$('#testPush').onclick=testPush;$('#diagBtn').onclick=diagnose;$('#ntfyBtn').onclick=ntfySetup;$('#popBtn').onclick=popHelp;$('#tgBtn').onclick=tgSetup;$('#appBtn').onclick=appSetup;$('#loopChk').onchange=e=>localStorage.setItem('bny-loop',e.target.checked?'1':'0');$('#toneSel').onchange=e=>{tone=e.target.value;localStorage.setItem('bny-tone',tone);playTone(tone)};$('#toneTry').onclick=()=>playTone($('#toneSel').value);$('#logoutBtn').onclick=()=>{$('#sheet').hidden=true;logout()}};
 function renderAll(){renderToday();renderKids();renderAdmin();renderCal();renderContacts()}
 renderAll();renderMe();updNotifBtn();checkReminders();sync();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
@@ -514,5 +515,31 @@ async function tgSetup(){
         <li>חזור לכאן ולחץ:<br><button class="btn" id="tgCheck" type="button" style="margin-top:6px">בדקתי – בדוק חיבור</button></li>
       </ol>`);
     $('#tgCheck').onclick=tgSetup;
+  }
+}
+
+// ---- אפליקציית אנדרואיד (APK): התראה במסך מלא גם כשהאפליקציה סגורה ----
+const inApp=()=>!!window.AndroidBridge;
+async function linkNative(){
+  if(!inApp()||!token)return;
+  try{const r=await fetch('/api/subscribe?ntfy=1',{headers:hdr()});if(r.ok){const {topic}=await r.json();if(topic)AndroidBridge.setTopic(topic)}}catch{}
+}
+function appSetup(){
+  if(inApp()){
+    let s={};try{s=JSON.parse(AndroidBridge.status())}catch{}
+    const row=(ok,t)=>`<div>${ok?'✅':'❌'} ${t}</div>`;
+    sheet('📲 אפליקציית אנדרואיד',`<div style="line-height:1.9;text-align:right;margin-bottom:12px">
+        ${row(s.topic,'מחובר להתראות המשפחה')}${row(s.notif,'הרשאת התראות')}${row(s.overlay,'הצגה מעל אפליקציות אחרות')}${row(s.fsi,'הודעות במסך מלא')}${row(s.battery,'סוללה: ללא הגבלה')}</div>
+      <button class="btn" id="appTest" type="button">🔔 בדיקת מסך מלא</button>
+      <p class="mut" style="font-size:12px;margin-top:10px">אם יש ❌ – לחץ שוב על הכפתור הזה אחרי שאישרת בהגדרות. כדי לבדוק מסך נעול: לחץ "בדיקה", ובתוך 5 שניות כבה את המסך.</p>`);
+    $('#appTest').onclick=()=>{linkNative();setTimeout(()=>AndroidBridge.testAlarm(),400)};
+    linkNative();
+  }else{
+    sheet('📲 אפליקציית אנדרואיד',`<p style="margin-bottom:10px">האפליקציה פותחת <b>מסך מלא עם צליל</b> על התראה, גם כשהטלפון נעול או כשאתה באפליקציה אחרת, ובו כפתורי "בוצע" / "נודניק".</p>
+      <ol class="steps">
+        <li>הורד והתקן:<br><a class="miniWa" style="background:#18b37e" href="/downloads/benyehuda.apk">⬇️ הורד את האפליקציה (APK)</a></li>
+        <li>אשר "התקנה ממקור לא מוכר" כשהטלפון שואל. אם יש אזהרת Play Protect – "התקן בכל זאת".</li>
+        <li>פתח את האפליקציה, היכנס בשם המשתמש והסיסמה, ואשר את ההרשאות שהיא מבקשת.</li>
+      </ol><p class="mut" style="font-size:12px">אנדרואיד בלבד. באייפון אין דרך לעשות את זה.</p>`);
   }
 }

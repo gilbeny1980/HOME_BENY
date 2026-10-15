@@ -1,0 +1,6 @@
+<resources>
+    <style name="Theme.BenYehuda" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="android:statusBarColor">#5b3df0</item>
+        <item name="android:windowBackground">#5b3df0</item>
+    </style>
+</resources>
