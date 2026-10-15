@@ -299,8 +299,8 @@ $('#loginFormMain').onsubmit=async e=>{e.preventDefault();const f=Object.fromEnt
 $('#mgrBtn').onclick=async()=>{if(await requestOtp())$('#loginOtp').hidden=false};
 $('#loginOtp').onsubmit=async e=>{e.preventDefault();const t=await verifyOtp(e.target.code.value);if(!t)return;
   adminTok=t.token;localStorage.setItem('bny-admin',adminTok);e.target.reset();e.target.hidden=true;renderAdmin();loggedIn(t.token,'מנהל')};
-$('#meBtn').onclick=()=>{sheet(myName||'משתמש',`<label class="lbl">🎵 צלצול התראה (כשהאפליקציה פתוחה)</label><div class="row" style="margin-bottom:10px"><select id="toneSel">${Object.entries(TONES).map(([k,v])=>`<option value="${k}" ${k===tone?'selected':''}>${v[0]}</option>`).join('')}</select><button class="btn" id="toneTry" style="flex:none">▶ השמע</button></div><label class="lbl" style="flex-direction:row;gap:8px;align-items:center;margin-bottom:10px;color:var(--text)"><input type="checkbox" id="loopChk" ${localStorage.getItem('bny-loop')!=='0'?'checked':''} style="width:auto"> צלצול מתמשך עד שלוחצים "הבנתי"</label><label class="lbl" style="margin-bottom:10px">🔊 עוצמת הצלצול<input type="range" id="volRange" min="20" max="100" step="10" value="${Math.round(vol*100)}" style="padding:0"></label><p class="mut" style="margin-bottom:10px;font-size:12px">כשהאפליקציה סגורה, הצליל נקבע בהגדרות ההתראות של הטלפון.</p><button class="act" id="testPush">🔔 שלח לי התראת בדיקה</button><button class="act" id="diagBtn">🩺 בדיקת התראות במכשיר</button><button class="act" id="logoutBtn">🚪 התנתק</button>`);
-  $('#volRange').onchange=e=>{vol=e.target.value/100;localStorage.setItem('bny-vol',String(vol));playTone(tone)};$('#testPush').onclick=testPush;$('#diagBtn').onclick=diagnose;$('#loopChk').onchange=e=>localStorage.setItem('bny-loop',e.target.checked?'1':'0');$('#toneSel').onchange=e=>{tone=e.target.value;localStorage.setItem('bny-tone',tone);playTone(tone)};$('#toneTry').onclick=()=>playTone($('#toneSel').value);$('#logoutBtn').onclick=()=>{$('#sheet').hidden=true;logout()}};
+$('#meBtn').onclick=()=>{sheet(myName||'משתמש',`<label class="lbl">🎵 צלצול התראה (כשהאפליקציה פתוחה)</label><div class="row" style="margin-bottom:10px"><select id="toneSel">${Object.entries(TONES).map(([k,v])=>`<option value="${k}" ${k===tone?'selected':''}>${v[0]}</option>`).join('')}</select><button class="btn" id="toneTry" style="flex:none">▶ השמע</button></div><label class="lbl" style="flex-direction:row;gap:8px;align-items:center;margin-bottom:10px;color:var(--text)"><input type="checkbox" id="loopChk" ${localStorage.getItem('bny-loop')!=='0'?'checked':''} style="width:auto"> צלצול מתמשך עד שלוחצים "הבנתי"</label><label class="lbl" style="margin-bottom:10px">🔊 עוצמת הצלצול<input type="range" id="volRange" min="20" max="100" step="10" value="${Math.round(vol*100)}" style="padding:0"></label><p class="mut" style="margin-bottom:10px;font-size:12px">כשהאפליקציה סגורה, הצליל נקבע בהגדרות ההתראות של הטלפון.</p><button class="act" id="testPush">🔔 שלח לי התראת בדיקה</button><button class="act" id="ntfyBtn">📲 התראות דחופות – קופצות על המסך (ntfy)</button><button class="act" id="diagBtn">🩺 בדיקת התראות במכשיר</button><button class="act" id="logoutBtn">🚪 התנתק</button>`);
+  $('#volRange').onchange=e=>{vol=e.target.value/100;localStorage.setItem('bny-vol',String(vol));playTone(tone)};$('#testPush').onclick=testPush;$('#diagBtn').onclick=diagnose;$('#ntfyBtn').onclick=ntfySetup;$('#loopChk').onchange=e=>localStorage.setItem('bny-loop',e.target.checked?'1':'0');$('#toneSel').onchange=e=>{tone=e.target.value;localStorage.setItem('bny-tone',tone);playTone(tone)};$('#toneTry').onclick=()=>playTone($('#toneSel').value);$('#logoutBtn').onclick=()=>{$('#sheet').hidden=true;logout()}};
 function renderAll(){renderToday();renderKids();renderAdmin();renderCal();renderContacts()}
 renderAll();renderMe();updNotifBtn();checkReminders();sync();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
@@ -468,3 +468,21 @@ async function loadPending(){
   }catch{}}
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')loadPending()});
 $('#pendingList').onclick=e=>{const b=e.target.closest('.doneBtn');if(b)confirmDone(b.dataset.eid,+b.dataset.at)};
+
+// ntfy: אפליקציית התראות דחופות (קופצת על המסך, גם נעול). כל אחד נרשם לערוץ הסודי שלו.
+async function ntfySetup(){
+  let topic='';
+  try{const r=await fetch('/api/subscribe?ntfy=1',{headers:hdr()});if(!r.ok)throw 0;topic=(await r.json()).topic}catch{return toast('לא הצלחתי לקבל ערוץ – נסה שוב')}
+  sheet('📲 התראות דחופות (ntfy)',`
+    <ol class="steps">
+      <li>התקן את האפליקציה החינמית <b>ntfy</b>:<br><a class="miniWa" style="background:#3b82c4" href="https://play.google.com/store/apps/details?id=io.heckel.ntfy" target="_blank" rel="noopener">אנדרואיד</a> <a class="miniWa" style="background:#555" href="https://apps.apple.com/app/ntfy/id1625396347" target="_blank" rel="noopener">אייפון</a></li>
+      <li>באפליקציה לחץ <b>＋</b> והזן את שם הערוץ שלך (אל תשתף אותו):<div class="topicBox" dir="ltr">${esc(topic)}</div>
+        <button class="btn ghost" id="ntfyCopy" type="button" style="margin:6px 0">📋 העתק שם ערוץ</button>
+        <a class="miniWa" href="ntfy://ntfy.sh/${esc(topic)}">פתח ישר ב־ntfy</a></li>
+      <li>לחץ <b>"שלח בדיקה"</b> – ההתראה אמורה לקפוץ על המסך:<br><button class="btn" id="ntfyTest" type="button" style="margin-top:6px">🔔 שלח בדיקה</button></li>
+      <li>באנדרואיד: בהגדרות ntfy ← <b>"Override Do Not Disturb"</b> לעדיפות מקסימלית, ו־"סוללה ← ללא הגבלה".</li>
+    </ol>
+    <p class="mut" style="font-size:12px">מעכשיו כל תזכורת נשלחת גם ל־ntfy בעדיפות הגבוהה ביותר, עם כפתורים "בוצע" / "נודניק" על ההתראה עצמה.</p>`);
+  $('#ntfyCopy').onclick=async()=>{try{await navigator.clipboard.writeText(topic);toast('הועתק ✔')}catch{toast('העתק ידנית')}};
+  $('#ntfyTest').onclick=async()=>{try{const r=await fetch('/api/subscribe',{method:'POST',headers:hdr(),body:JSON.stringify({ntfyTest:true})});toast(r.ok?'נשלחה בדיקה – בדוק את ntfy':'השליחה נכשלה')}catch{toast('אין חיבור לשרת')}};
+}

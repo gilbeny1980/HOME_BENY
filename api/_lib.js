@@ -35,6 +35,18 @@ async function canConfirm(uname, admin) {
   if (admin || uname === 'admin') return true;
   return !!(await getUsers()).find(x => x.u === uname && x.p);
 }
+// ---- ntfy (urgent push app): each person who opts in gets a secret topic ----
+const ntfyTopics = async () => (await getJSON('bny:ntfy')) || {};
+async function ntfyTopic(uname, create) {
+  const m = await ntfyTopics();
+  if (!m[uname] && create) { m[uname] = 'bny-' + crypto.randomBytes(10).toString('hex'); await setJSON('bny:ntfy', m); }
+  return m[uname] || null;
+}
+async function ntfyUserByTopic(t) { const m = await ntfyTopics(); return Object.keys(m).find(u => m[u] === t) || null; }
+async function ntfyPublish(msg) {
+  const r = await fetch('https://ntfy.sh/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ priority: 5, tags: ['bell'], ...msg }) });
+  if (!r.ok) throw new Error('ntfy ' + r.status);
+}
 const subDel = endpoint => exec('DELETE FROM subs WHERE endpoint = ?', [endpoint]);
 // true only the first time a key is marked (prevents duplicate reminders)
 const markFired = async k => (await exec('INSERT OR IGNORE INTO fired (k) VALUES (?)', [k])).rowsAffected > 0;
@@ -94,4 +106,4 @@ async function setPassword(pw) {
   await exec("DELETE FROM sess WHERE role = 'user'"); // everyone must log in again with the new password
 }
 
-module.exports = { subUname, canConfirm, snoozeAdd, snoozesDue, snoozeDel, wasFired, subGet, subCount, exec, sha, isAdmin, newSession, getSession, getUsers, checkPassword, setPassword, subPut, subsAll, subDel, markFired, getJSON, setJSON, merge, auth };
+module.exports = { ntfyTopics, ntfyTopic, ntfyUserByTopic, ntfyPublish, subUname, canConfirm, snoozeAdd, snoozesDue, snoozeDel, wasFired, subGet, subCount, exec, sha, isAdmin, newSession, getSession, getUsers, checkPassword, setPassword, subPut, subsAll, subDel, markFired, getJSON, setJSON, merge, auth };

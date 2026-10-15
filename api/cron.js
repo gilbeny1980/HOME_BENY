@@ -1,5 +1,5 @@
 const webpush = require('web-push');
-const { markFired, wasFired, subsAll, subDel, subGet, snoozesDue, snoozeDel, getJSON, setJSON, getUsers } = require('./_lib');
+const { markFired, wasFired, subsAll, subDel, subGet, snoozesDue, snoozeDel, getJSON, setJSON, getUsers, ntfyTopics, ntfyPublish } = require('./_lib');
 const REC = require('../rec.js');
 // Called every 5 minutes by GitHub Actions. Public on purpose: it only sends reminders that are already due,
 // and each reminder is sent once (markFired), so calling it extra times is harmless.
@@ -67,6 +67,19 @@ module.exports = async (req, res) => {
       try { await webpush.sendNotification(sub, JSON.stringify({ title: m.title, body: m.body, eid: m.eid || '', at: m.at || 0, req: !!m.req && (!uname || uname === 'admin' || parents.includes(uname)) })); sent++; }
       catch (err) { fails.push(err.statusCode || String(err.message || err).slice(0, 40)); if (err.statusCode === 404 || err.statusCode === 410) await subDel(sub.endpoint); }
     }
+    // urgent notifications through ntfy (only for people who set it up): max priority, with action buttons
+    let nsent = 0;
+    const topics = await ntfyTopics(), site = `https://${req.headers['x-forwarded-host'] || req.headers.host}`;
+    const post = body => ({ action: 'http', method: 'POST', url: `${site}/api/snooze`, headers: { 'Content-Type': 'application/json' }, clear: true, body: JSON.stringify(body) });
+    for (const m of msgs) for (const u of Object.keys(topics)) {
+      if (m.to && u !== 'admin' && !m.to.includes(u)) continue;
+      const confirmer = u === 'admin' || parents.includes(u), topic = topics[u];
+      const actions = !m.eid ? [] : (m.req && confirmer)
+        ? [{ ...post({ action: 'done', topic, eid: m.eid, at: m.at }), label: '✔ בוצע' }, { ...post({ action: 'pause', topic, eid: m.eid, at: m.at, minutes: 10 }), label: '⏰ נודניק 10 דק׳' }]
+        : [{ ...post({ action: 'ack', eid: m.eid, at: m.at }), label: '✔ הבנתי' }];
+      try { await ntfyPublish({ topic, title: m.title, message: m.body, click: site + '/', actions }); nsent++; } catch (err) { fails.push('ntfy'); }
+    }
+    sent += nsent;
     // due snoozes go back only to the device that asked
     for (const s of await snoozesDue(now)) {
       const sub = await subGet(s.endpoint);
