@@ -11,8 +11,17 @@ android {
         applicationId = "il.benyehuda.family"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
+    }
+    signingConfigs {
+        // fixed key so that every new build installs as an UPDATE over the previous one
+        getByName("debug") {
+            storeFile = file("../debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
     }
     buildTypes {
         release { isMinifyEnabled = false }
