@@ -116,6 +116,10 @@ class MainActivity : AppCompatActivity() {
     inner class Bridge {
         @JavascriptInterface fun hasApp(): Boolean = true
 
+        /** true when the phone is in dark mode (the WebView does not always report it to the page by itself) */
+        @JavascriptInterface fun isDark(): Boolean =
+            (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
+
         @JavascriptInterface fun setTopic(t: String) {
             if (t.isBlank()) return
             val changed = Prefs.topic(this@MainActivity) != t

@@ -543,3 +543,7 @@ function appSetup(){
       </ol><p class="mut" style="font-size:12px">אנדרואיד בלבד. באייפון אין דרך לעשות את זה.</p>`);
   }
 }
+
+// בתוך אפליקציית האנדרואיד: מצב חשוך לפי הטלפון (ה-WebView לא תמיד מדווח עליו לדף)
+function applyNativeTheme(){try{if(window.AndroidBridge&&AndroidBridge.isDark)document.documentElement.dataset.theme=AndroidBridge.isDark()?'dark':'light'}catch{}}
+applyNativeTheme();addEventListener('focus',applyNativeTheme);document.addEventListener('visibilitychange',applyNativeTheme);
