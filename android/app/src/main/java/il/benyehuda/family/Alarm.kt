@@ -18,10 +18,21 @@ object Alarm {
     /** Opens the full-screen alarm: directly over any app (if "display over other apps" is allowed) and as a full-screen-intent notification. */
     fun show(ctx: Context, title: String, body: String, actions: ArrayList<Array<String>>) {
         val nm = ctx.getSystemService(NotificationManager::class.java)
-        if (Build.VERSION.SDK_INT >= 26) {
-            val ch = NotificationChannel(CH, "התראות דחופות", NotificationManager.IMPORTANCE_HIGH)
+        // one channel per chosen sound (a channel's sound cannot be changed after it is created)
+        val sound = Prefs.sound(ctx)
+        val chId = "alarm_$sound"
+        if (nm.getNotificationChannel(chId) == null) {
+            val ch = NotificationChannel(chId, "התראות דחופות", NotificationManager.IMPORTANCE_HIGH)
             ch.enableVibration(true)
             ch.lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+            val res = ctx.resources.getIdentifier("tone_$sound", "raw", ctx.packageName)
+            if (sound != "silent" && res != 0) {
+                ch.setSound(
+                    android.net.Uri.parse("android.resource://${ctx.packageName}/$res"),
+                    android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_ALARM)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION).build()
+                )
+            } else if (sound == "silent") ch.setSound(null, null)
             nm.createNotificationChannel(ch)
         }
         val intent = Intent(ctx, AlarmActivity::class.java)
@@ -29,7 +40,7 @@ object Alarm {
             .putExtra(X_TITLE, title).putExtra(X_BODY, body)
             .putExtra(X_ACTIONS, ArrayList(actions.map { it.joinToString("\u0001") }))
         val pi = PendingIntent.getActivity(ctx, (System.currentTimeMillis() % 100000).toInt(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        val n = NotificationCompat.Builder(ctx, CH)
+        val n = NotificationCompat.Builder(ctx, chId)
             .setSmallIcon(android.R.drawable.ic_popup_reminder)
             .setContentTitle(title)
             .setContentText(body)

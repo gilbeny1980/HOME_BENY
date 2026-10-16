@@ -116,6 +116,8 @@ class MainActivity : AppCompatActivity() {
     inner class Bridge {
         @JavascriptInterface fun hasApp(): Boolean = true
 
+        @JavascriptInterface fun setSound(name: String) { Prefs.setSound(this@MainActivity, name.filter { it.isLetterOrDigit() || it == '_' }.ifEmpty { "msg" }) }
+
         /** true when the phone is in dark mode (the WebView does not always report it to the page by itself) */
         @JavascriptInterface fun isDark(): Boolean =
             (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES

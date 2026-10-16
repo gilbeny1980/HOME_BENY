@@ -138,7 +138,14 @@ $('#eventList').onclick=e=>{const im=e.target.closest('.evImg');if(im)return sho
 // צליל התראה: צליל הודעה מודרני ועדין (שלושה צלילים עולים, קצת "זכוכית" והד קצר)
 const GLASS=[[1,1],[2,.28],[3,.1],[4.1,.04]];
 const TONES={
-  msg:['הודעה חדשה ✨',[[659,0,.55],[988,.11,.6],[1319,.24,1.1]],'sine',GLASS,.34,true],
+  msg:["הודעה חדשה ✨",[[659, 0, 0.55], [988, 0.11, 0.6], [1319, 0.24, 1.1]],'sine',[[1, 1], [2, 0.28], [3, 0.1], [4.1, 0.04]],0.34,true],
+  bubble:["בועה 🫧",[[520, 0, 0.16, 1040], [700, 0.14, 0.18, 1400], [880, 0.3, 0.3, 1760]],'sine',[[1, 1], [2, 0.15]],0.4,false],
+  drop:["טיפה 💧",[[1760, 0, 0.45, 1100], [1320, 0.32, 0.5, 880]],'sine',[[1, 1], [2, 0.2]],0.36,true],
+  bell:["פעמון רך 🔔",[[988, 0, 1.2], [1480, 0.2, 1.4]],'sine',[[1, 1], [2.76, 0.28], [5.4, 0.1]],0.3,true],
+  doorbell:["פעמון דלת 🚪",[[659, 0, 0.9], [523, 0.45, 1.4]],'sine',[[1, 1], [2, 0.3], [3, 0.1]],0.36,true],
+  sparkle:["נצנוץ ✨",[[1319, 0, 0.35], [1568, 0.07, 0.35], [1976, 0.14, 0.35], [2349, 0.21, 0.35], [2637, 0.28, 0.8]],'sine',[[1, 1], [2, 0.2]],0.26,true],
+  harp:["נבל 🎶",[[523, 0, 0.9], [659, 0.09, 0.9], [784, 0.18, 0.9], [1046, 0.27, 0.9], [1318, 0.36, 1.2]],'triangle',[[1, 1], [2, 0.35], [3, 0.15]],0.3,false],
+  marimba:["מרימבה 🥁",[[784, 0, 0.3], [988, 0.14, 0.3], [1318, 0.28, 0.3], [1568, 0.42, 0.55]],'sine',[[1, 1], [4, 0.22]],0.4,false],
   silent:['שקט (בלי צליל)',[],'sine',[[1,1]],0]
 };
 let tone=localStorage.getItem('bny-tone');if(!TONES[tone])tone='msg';
@@ -149,8 +156,9 @@ function playTone(name){try{const t=TONES[name]||TONES.msg;if(!t[1].length)retur
   const c=ctx(),master=c.createGain(),comp=c.createDynamicsCompressor();master.gain.value=vol*3;comp.threshold.value=-4;comp.knee.value=0;comp.ratio.value=20;comp.attack.value=0;comp.release.value=.15;master.connect(comp);comp.connect(c.destination);
   let echo=null;
   if(t[5]){echo=c.createDelay(.6);echo.delayTime.value=.22;const fb=c.createGain();fb.gain.value=.32;const wet=c.createGain();wet.gain.value=.5;echo.connect(fb);fb.connect(echo);echo.connect(wet);wet.connect(master)}
-  t[1].forEach(([f,at,dur])=>{for(const [mult,amp] of t[3]){const o=c.createOscillator(),g=c.createGain();o.type=t[2];o.frequency.value=f*mult;o.connect(g);g.connect(master);if(echo)g.connect(echo);
-    const s=c.currentTime+at,v=Math.min(.95,t[4]*3*amp/(mult>1?1.2:1));g.gain.setValueAtTime(.0001,s);g.gain.exponentialRampToValueAtTime(v,s+.015);g.gain.exponentialRampToValueAtTime(.0001,s+dur);o.start(s);o.stop(s+dur+.05)}})}catch{}}
+  t[1].forEach(([f,at,dur,f2])=>{for(const [mult,amp] of t[3]){const o=c.createOscillator(),g=c.createGain();o.type=t[2];o.connect(g);g.connect(master);if(echo)g.connect(echo);
+    const s=c.currentTime+at;o.frequency.setValueAtTime(f*mult,s);if(f2)o.frequency.exponentialRampToValueAtTime(f2*mult,s+dur*.7);
+    const v=Math.min(.95,t[4]*3*amp/(mult>1?1.2:1));g.gain.setValueAtTime(.0001,s);g.gain.exponentialRampToValueAtTime(v,s+.015);g.gain.exponentialRampToValueAtTime(.0001,s+dur);o.start(s);o.stop(s+dur+.05)}})}catch{}}
 function beep(){playTone(tone)}
 async function notify(title,body){
   toast('🔔 '+title);
@@ -288,7 +296,7 @@ $('#mgrBtn').onclick=async()=>{if(await requestOtp())$('#loginOtp').hidden=false
 $('#loginOtp').onsubmit=async e=>{e.preventDefault();const t=await verifyOtp(e.target.code.value);if(!t)return;
   adminTok=t.token;localStorage.setItem('bny-admin',adminTok);e.target.reset();e.target.hidden=true;renderAdmin();loggedIn(t.token,'מנהל')};
 $('#meBtn').onclick=()=>{sheet(myName||'משתמש',`<label class="lbl">🎵 צלצול התראה (כשהאפליקציה פתוחה)</label><div class="row" style="margin-bottom:10px"><select id="toneSel">${Object.entries(TONES).map(([k,v])=>`<option value="${k}" ${k===tone?'selected':''}>${v[0]}</option>`).join('')}</select><button class="btn" id="toneTry" style="flex:none">▶ השמע</button></div><label class="lbl" style="flex-direction:row;gap:8px;align-items:center;margin-bottom:10px;color:var(--text)"><input type="checkbox" id="loopChk" ${localStorage.getItem('bny-loop')!=='0'?'checked':''} style="width:auto"> צלצול מתמשך עד שלוחצים "הבנתי"</label><label class="lbl" style="margin-bottom:10px">🔊 עוצמת הצלצול<input type="range" id="volRange" min="20" max="100" step="10" value="${Math.round(vol*100)}" style="padding:0"></label><p class="mut" style="margin-bottom:10px;font-size:12px">כשהאפליקציה סגורה, הצליל נקבע בהגדרות ההתראות של הטלפון.</p><button class="act" id="testPush">🔔 שלח לי התראת בדיקה</button><button class="act" id="appBtn">📲 אפליקציית אנדרואיד – מסך מלא גם כשסגור</button><button class="act" id="tgBtn">✈️ התראות בטלגרם – קופצות כמו הודעה</button><button class="act" id="popBtn">📱 איך גורמים להתראה לקפוץ על המסך</button><button class="act" id="ntfyBtn">📲 התראות דחופות – קופצות על המסך (ntfy)</button><button class="act" id="diagBtn">🩺 בדיקת התראות במכשיר</button><button class="act" id="logoutBtn">🚪 התנתק</button>`);
-  $('#volRange').onchange=e=>{vol=e.target.value/100;localStorage.setItem('bny-vol',String(vol));playTone(tone)};$('#testPush').onclick=testPush;$('#diagBtn').onclick=diagnose;$('#ntfyBtn').onclick=ntfySetup;$('#popBtn').onclick=popHelp;$('#tgBtn').onclick=tgSetup;$('#appBtn').onclick=appSetup;$('#loopChk').onchange=e=>localStorage.setItem('bny-loop',e.target.checked?'1':'0');$('#toneSel').onchange=e=>{tone=e.target.value;localStorage.setItem('bny-tone',tone);playTone(tone)};$('#toneTry').onclick=()=>playTone($('#toneSel').value);$('#logoutBtn').onclick=()=>{$('#sheet').hidden=true;logout()}};
+  $('#volRange').onchange=e=>{vol=e.target.value/100;localStorage.setItem('bny-vol',String(vol));playTone(tone)};$('#testPush').onclick=testPush;$('#diagBtn').onclick=diagnose;$('#ntfyBtn').onclick=ntfySetup;$('#popBtn').onclick=popHelp;$('#tgBtn').onclick=tgSetup;$('#appBtn').onclick=appSetup;$('#loopChk').onchange=e=>localStorage.setItem('bny-loop',e.target.checked?'1':'0');$('#toneSel').onchange=e=>{tone=e.target.value;localStorage.setItem('bny-tone',tone);syncNativeSound();playTone(tone)};$('#toneTry').onclick=()=>playTone($('#toneSel').value);$('#logoutBtn').onclick=()=>{$('#sheet').hidden=true;logout()}};
 function renderAll(){renderToday();renderKids();renderAdmin();renderCal();renderContacts()}
 renderAll();renderMe();updNotifBtn();checkReminders();sync();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
@@ -520,7 +528,9 @@ async function tgSetup(){
 
 // ---- אפליקציית אנדרואיד (APK): התראה במסך מלא גם כשהאפליקציה סגורה ----
 const inApp=()=>!!window.AndroidBridge;
+function syncNativeSound(){try{if(window.AndroidBridge&&AndroidBridge.setSound)AndroidBridge.setSound(tone)}catch{}}
 async function linkNative(){
+  syncNativeSound();
   if(!inApp()||!token)return;
   try{const r=await fetch('/api/subscribe?ntfy=1',{headers:hdr()});if(r.ok){const {topic}=await r.json();if(topic)AndroidBridge.setTopic(topic)}}catch{}
 }

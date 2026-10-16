@@ -119,15 +119,21 @@ class AlarmActivity : AppCompatActivity() {
         try {
             val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
             am.setStreamVolume(AudioManager.STREAM_ALARM, am.getStreamMaxVolume(AudioManager.STREAM_ALARM), 0)
-            val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-            player = MediaPlayer().apply {
-                setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
-                setDataSource(this@AlarmActivity, uri)
-                isLooping = true
-                setVolume(1f, 1f)
-                prepare()
-                start()
+            val sound = Prefs.sound(this)
+            val res = resources.getIdentifier("tone_$sound", "raw", packageName)
+            if (sound != "silent") {
+                val mp = MediaPlayer()
+                mp.setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
+                if (res != 0) {
+                    resources.openRawResourceFd(res).use { mp.setDataSource(it.fileDescriptor, it.startOffset, it.length) }
+                } else {
+                    mp.setDataSource(this, RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
+                }
+                mp.isLooping = true
+                mp.setVolume(1f, 1f)
+                mp.prepare()
+                mp.start()
+                player = mp
             }
         } catch (e: Exception) { }
         try {
