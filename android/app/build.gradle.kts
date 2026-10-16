@@ -11,8 +11,8 @@ android {
         applicationId = "il.benyehuda.family"
         minSdk = 26
         targetSdk = 34
-        versionCode = 8
-        versionName = "1.7"
+        versionCode = 9
+        versionName = "1.8"
     }
     signingConfigs {
         // fixed key so that every new build installs as an UPDATE over the previous one
