@@ -135,7 +135,29 @@ class MainActivity : AppCompatActivity() {
         }
 
         @JavascriptInterface fun testAlarm() {
-            Alarm.show(this@MainActivity, "בדיקת התראה ✔", "אם המסך הזה קפץ – האפליקציה מוגדרת נכון", arrayListOf())
+            // the app is in front, so open the alarm screen directly (no special permission needed for this test)
+            runOnUiThread {
+                startActivity(Intent(this@MainActivity, AlarmActivity::class.java)
+                    .putExtra(Alarm.X_TITLE, "בדיקת התראה ✔")
+                    .putExtra(Alarm.X_BODY, "אם המסך הזה קפץ ויש צליל – האפליקציה עובדת")
+                    .putExtra(Alarm.X_ACTIONS, ArrayList<String>()))
+            }
+        }
+
+        @JavascriptInterface fun openSetting(kind: String) {
+            runOnUiThread {
+                try {
+                    val pkg = Uri.parse("package:$packageName")
+                    when (kind) {
+                        "overlay" -> startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, pkg))
+                        "fsi" -> if (Build.VERSION.SDK_INT >= 34) startActivity(Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, pkg))
+                        "battery" -> startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, pkg))
+                        "notif" -> startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName))
+                    }
+                } catch (e: Exception) {
+                    try { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))) } catch (e2: Exception) { }
+                }
+            }
         }
 
         @JavascriptInterface fun status(): String {
@@ -144,7 +166,8 @@ class MainActivity : AppCompatActivity() {
             val overlay = Build.VERSION.SDK_INT < 23 || Settings.canDrawOverlays(c)
             val fsi = Build.VERSION.SDK_INT < 34 || c.getSystemService(NotificationManager::class.java).canUseFullScreenIntent()
             val batt = Build.VERSION.SDK_INT < 23 || c.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(c.packageName)
-            return "{\"topic\":${Prefs.topic(c).isNotEmpty()},\"notif\":$notif,\"overlay\":$overlay,\"fsi\":$fsi,\"battery\":$batt}"
+            val listening = System.currentTimeMillis() - ListenerService.connectedAt < 150000
+            return "{\"topic\":${Prefs.topic(c).isNotEmpty()},\"listening\":$listening,\"notif\":$notif,\"overlay\":$overlay,\"fsi\":$fsi,\"battery\":$batt}"
         }
     }
 }

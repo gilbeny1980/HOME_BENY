@@ -69,9 +69,11 @@ class ListenerService : Service() {
                 conn.connectTimeout = 15000
                 conn.readTimeout = 150000
                 BufferedReader(InputStreamReader(conn.inputStream, Charsets.UTF_8)).use { r ->
+                    connectedAt = System.currentTimeMillis()
                     backoff = 3000L
                     while (running) {
                         val line = r.readLine() ?: break
+                        connectedAt = System.currentTimeMillis()
                         if (line.isBlank()) continue
                         handle(line)
                     }
@@ -103,6 +105,7 @@ class ListenerService : Service() {
     }
 
     companion object {
+        @Volatile var connectedAt = 0L
         fun start(c: Context) {
             ContextCompat.startForegroundService(c, Intent(c, ListenerService::class.java))
         }

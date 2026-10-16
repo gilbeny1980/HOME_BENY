@@ -192,6 +192,7 @@ let pushOn=localStorage.getItem('bny-push')==='1';
 const b64=s=>{s=(s+'='.repeat((4-s.length%4)%4)).replace(/-/g,'+').replace(/_/g,'/');return Uint8Array.from(atob(s),c=>c.charCodeAt(0))};
 const hdr=()=>({'x-token':token,'x-admin-code':adminTok,'content-type':'application/json'});
 async function enablePush(verbose){
+  if(inApp())return false; // inside the Android app, reminders come through the native alarm
   const say=m=>{if(verbose)toast(m)};
   try{
     if(!('serviceWorker' in navigator)||!('PushManager' in window)){say('המכשיר/הדפדפן לא תומך בהתראות. באייפון: הוסף למסך הבית ופתח משם');return false}
@@ -228,7 +229,7 @@ async function sync(){
 }
 setInterval(()=>{if(!document.hidden)sync()},30000);
 addEventListener('online',sync);
-function updNotifBtn(){const b=$('#notifBtn');b.hidden=!('Notification' in window)||(Notification.permission==='granted'&&localStorage.getItem('bny-push')==='1')}
+function updNotifBtn(){const b=$('#notifBtn');b.hidden=inApp()||!('Notification' in window)||(Notification.permission==='granted'&&localStorage.getItem('bny-push')==='1')}
 $('#notifBtn').onclick=askNotif;
 setInterval(checkReminders,30000);document.addEventListener('visibilitychange',checkReminders);
 
@@ -303,8 +304,8 @@ $('#loginFormMain').onsubmit=async e=>{e.preventDefault();const f=Object.fromEnt
 $('#mgrBtn').onclick=async()=>{if(await requestOtp())$('#loginOtp').hidden=false};
 $('#loginOtp').onsubmit=async e=>{e.preventDefault();const t=await verifyOtp(e.target.code.value);if(!t)return;
   adminTok=t.token;localStorage.setItem('bny-admin',adminTok);e.target.reset();e.target.hidden=true;renderAdmin();loggedIn(t.token,'מנהל')};
-$('#meBtn').onclick=()=>{sheet(myName||'משתמש',`<label class="lbl">🎵 צלצול התראה (כשהאפליקציה פתוחה)</label><div class="row" style="margin-bottom:10px"><select id="toneSel">${Object.entries(TONES).map(([k,v])=>`<option value="${k}" ${k===tone?'selected':''}>${v[0]}</option>`).join('')}</select><button class="btn" id="toneTry" style="flex:none">▶ השמע</button></div><label class="lbl" style="flex-direction:row;gap:8px;align-items:center;margin-bottom:10px;color:var(--text)"><input type="checkbox" id="loopChk" ${localStorage.getItem('bny-loop')!=='0'?'checked':''} style="width:auto"> צלצול מתמשך עד שלוחצים "הבנתי"</label><label class="lbl" style="margin-bottom:10px">🔊 עוצמת הצלצול<input type="range" id="volRange" min="20" max="100" step="10" value="${Math.round(vol*100)}" style="padding:0"></label><p class="mut" style="margin-bottom:10px;font-size:12px">כשהאפליקציה סגורה, הצליל נקבע בהגדרות ההתראות של הטלפון.</p><button class="act" id="testPush">🔔 שלח לי התראת בדיקה</button><button class="act" id="appBtn">📲 אפליקציית אנדרואיד – מסך מלא גם כשסגור</button><button class="act" id="tgBtn">✈️ התראות בטלגרם – קופצות כמו הודעה</button><button class="act" id="popBtn">📱 איך גורמים להתראה לקפוץ על המסך</button><button class="act" id="ntfyBtn">📲 התראות דחופות – קופצות על המסך (ntfy)</button><button class="act" id="diagBtn">🩺 בדיקת התראות במכשיר</button><button class="act" id="logoutBtn">🚪 התנתק</button>`);
-  $('#volRange').onchange=e=>{vol=e.target.value/100;localStorage.setItem('bny-vol',String(vol));playTone(tone)};$('#testPush').onclick=testPush;$('#diagBtn').onclick=diagnose;$('#ntfyBtn').onclick=ntfySetup;$('#popBtn').onclick=popHelp;$('#tgBtn').onclick=tgSetup;$('#appBtn').onclick=appSetup;$('#loopChk').onchange=e=>localStorage.setItem('bny-loop',e.target.checked?'1':'0');$('#toneSel').onchange=e=>{tone=e.target.value;localStorage.setItem('bny-tone',tone);syncNativeSound();playTone(tone)};$('#toneTry').onclick=()=>playTone($('#toneSel').value);$('#logoutBtn').onclick=()=>{$('#sheet').hidden=true;logout()}};
+$('#meBtn').onclick=()=>{sheet(myName||'משתמש',`<label class="lbl">🎵 צלצול התראה (כשהאפליקציה פתוחה)</label><div class="row" style="margin-bottom:10px"><select id="toneSel">${Object.entries(TONES).map(([k,v])=>`<option value="${k}" ${k===tone?'selected':''}>${v[0]}</option>`).join('')}</select><button class="btn" id="toneTry" style="flex:none">▶ השמע</button></div><label class="lbl" style="flex-direction:row;gap:8px;align-items:center;margin-bottom:10px;color:var(--text)"><input type="checkbox" id="loopChk" ${localStorage.getItem('bny-loop')!=='0'?'checked':''} style="width:auto"> צלצול מתמשך עד שלוחצים "הבנתי"</label><label class="lbl" style="margin-bottom:10px">🔊 עוצמת הצלצול<input type="range" id="volRange" min="20" max="100" step="10" value="${Math.round(vol*100)}" style="padding:0"></label><p class="mut" style="margin-bottom:10px;font-size:12px">כשהאפליקציה סגורה, הצליל נקבע בהגדרות ההתראות של הטלפון.</p>${inApp()?'':`<button class="act" id="testPush">🔔 שלח לי התראת בדיקה</button>`}<button class="act" id="appBtn">📲 אפליקציית אנדרואיד – מסך מלא גם כשסגור</button>${inApp()?'':`<button class="act" id="tgBtn">✈️ התראות בטלגרם – קופצות כמו הודעה</button>`}<button class="act" id="popBtn">📱 איך גורמים להתראה לקפוץ על המסך</button>${inApp()?'':`<button class="act" id="ntfyBtn">📲 התראות דחופות – קופצות על המסך (ntfy)</button>`}${inApp()?'':`<button class="act" id="diagBtn">🩺 בדיקת התראות במכשיר</button>`}<button class="act" id="logoutBtn">🚪 התנתק</button>`);
+  $('#volRange').onchange=e=>{vol=e.target.value/100;localStorage.setItem('bny-vol',String(vol));playTone(tone)};{const e=$('#testPush');if(e)e.onclick=testPush}{const e=$('#diagBtn');if(e)e.onclick=diagnose}{const e=$('#ntfyBtn');if(e)e.onclick=ntfySetup}$('#popBtn').onclick=popHelp;{const e=$('#tgBtn');if(e)e.onclick=tgSetup}$('#appBtn').onclick=appSetup;$('#loopChk').onchange=e=>localStorage.setItem('bny-loop',e.target.checked?'1':'0');$('#toneSel').onchange=e=>{tone=e.target.value;localStorage.setItem('bny-tone',tone);syncNativeSound();playTone(tone)};$('#toneTry').onclick=()=>playTone($('#toneSel').value);$('#logoutBtn').onclick=()=>{$('#sheet').hidden=true;logout()}};
 function renderAll(){renderToday();renderKids();renderAdmin();renderCal();renderContacts()}
 renderAll();renderMe();updNotifBtn();checkReminders();sync();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
@@ -537,7 +538,7 @@ async function tgSetup(){
 }
 
 // ---- אפליקציית אנדרואיד (APK): התראה במסך מלא גם כשהאפליקציה סגורה ----
-const inApp=()=>!!window.AndroidBridge;
+function inApp(){return !!window.AndroidBridge}
 function syncNativeSound(){try{if(window.AndroidBridge&&AndroidBridge.setSound)AndroidBridge.setSound(tone)}catch{}}
 async function linkNative(){
   syncNativeSound();
@@ -547,11 +548,12 @@ async function linkNative(){
 function appSetup(){
   if(inApp()){
     let s={};try{s=JSON.parse(AndroidBridge.status())}catch{}
-    const row=(ok,t)=>`<div>${ok?'✅':'❌'} ${t}</div>`;
-    sheet('📲 אפליקציית אנדרואיד',`<div style="line-height:1.9;text-align:right;margin-bottom:12px">
-        ${row(s.topic,'מחובר להתראות המשפחה')}${row(s.notif,'הרשאת התראות')}${row(s.overlay,'הצגה מעל אפליקציות אחרות')}${row(s.fsi,'הודעות במסך מלא')}${row(s.battery,'סוללה: ללא הגבלה')}</div>
+    const row=(ok,t,fix)=>`<div style="display:flex;align-items:center;gap:8px;justify-content:space-between;padding:4px 0"><span>${ok?'✅':'❌'} ${t}</span>${ok||!fix?'':`<button class="miniWa" data-fix="${fix}" style="border:0;cursor:pointer">תקן</button>`}</div>`;
+    sheet('📲 אפליקציית אנדרואיד',`<div style="text-align:right;margin-bottom:12px">
+        ${row(s.topic,'מחובר לחשבון (ערוץ התראות)')}${row(s.listening,'מאזין לשרת ההתראות עכשיו')}${row(s.notif,'הרשאת התראות','notif')}${row(s.overlay,'הצגה מעל אפליקציות אחרות','overlay')}${row(s.fsi,'הודעות במסך מלא','fsi')}${row(s.battery,'סוללה: ללא הגבלה','battery')}</div>
       <button class="btn" id="appTest" type="button">🔔 בדיקת מסך מלא</button>
-      <p class="mut" style="font-size:12px;margin-top:10px">אם יש ❌ – לחץ שוב על הכפתור הזה אחרי שאישרת בהגדרות. כדי לבדוק מסך נעול: לחץ "בדיקה", ובתוך 5 שניות כבה את המסך.</p>`);
+      <p class="mut" style="font-size:12px;margin-top:10px">כל שורה עם ❌ – לחץ "תקן", אשר בהגדרות, וחזור לכאן. לבדיקת מסך נעול: לחץ "בדיקה" וכבה את המסך תוך 5 שניות.</p>`);
+    $$('#sheetBody [data-fix]').forEach(b=>b.onclick=()=>{try{AndroidBridge.openSetting(b.dataset.fix)}catch{}});
     $('#appTest').onclick=()=>{linkNative();setTimeout(()=>AndroidBridge.testAlarm(),400)};
     linkNative();
   }else{
