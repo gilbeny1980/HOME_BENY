@@ -64,6 +64,8 @@ class ListenerService : Service() {
             if (topic.isEmpty()) { stopSelf(); return }
             try {
                 var since = Prefs.since(this)
+                Prefs.installedAt(this)
+                since = Prefs.since(this)
                 if (since.isEmpty()) { since = (System.currentTimeMillis() / 1000).toString(); Prefs.setSince(this, since) }
                 val conn = URL("https://ntfy.sh/$topic/json?since=$since").openConnection() as HttpURLConnection
                 conn.connectTimeout = 15000
@@ -92,6 +94,10 @@ class ListenerService : Service() {
         val id = j.optString("id")
         if (id.isNotEmpty()) Prefs.setSince(this, id)
         if (j.optString("event") != "message") return
+        // only reminders that arrived after installation and are still fresh
+        val sent = j.optLong("time", 0L) * 1000
+        val now = System.currentTimeMillis()
+        if (sent > 0 && (sent < Prefs.installedAt(this) || now - sent > 30 * 60 * 1000L)) return
         val actions = ArrayList<Array<String>>()
         j.optJSONArray("actions")?.let { arr ->
             for (i in 0 until arr.length()) {

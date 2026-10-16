@@ -30,9 +30,9 @@ module.exports = async (req, res) => {
       const kids = e.kids && e.kids.length ? e.kids : (e.kid ? [e.kid] : []);
       const nag = Number(e.nag) > 0 ? Number(e.nag) : 0, needsDone = !!e.req;
       for (const date of REC.occDates(e, toDate)) {
-        const at = REC.ilToMs(date, e.time), fire = at - e.remind * 60000;
-        if (now < fire || now >= at + (needsDone ? 48 * 3600000 : nag ? 6 * 3600000 : 3600000)) continue;
-        const title = 'תזכורת: ' + e.title + (kids.length ? ` (${kids.join(', ')})` : ''), body = `${date} בשעה ${e.time}`, to = recipients(kids);
+        const tm = REC.timeOn(e, date), at = REC.ilToMs(date, tm), fire = at - e.remind * 60000;
+        if (now < fire || now >= at + (needsDone ? 6 * 3600000 : nag ? 6 * 3600000 : 3600000)) continue;
+        const title = 'תזכורת: ' + e.title + (kids.length ? ` (${kids.join(', ')})` : ''), body = `${date} בשעה ${tm}`, to = recipients(kids);
         const first = await markFired(`${e.id}:${at}`);
         if (first) msgs.push({ title, body, to, eid: e.id, at, req: needsDone });
         if (needsDone) {

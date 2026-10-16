@@ -19,9 +19,9 @@ module.exports = async (req, res) => {
     for (const e of (db.events || [])) {
       if (e.del || !e.req || !e.date) continue;
       for (const date of REC.occDates(e, day(now + 2 * 864e5))) {
-        if (date < day(now - 7 * 864e5)) continue;
-        const at = REC.ilToMs(date, e.time), fire = at - Math.max(Number(e.remind) || 0, 0) * 60000;
-        if (now >= fire && !(await wasFired(`done:${e.id}:${at}`))) pending.push({ eid: e.id, at, title: e.title, date, time: e.time, kids: e.kids || [] });
+        if (date < day(now - 2 * 864e5)) continue;
+        const tm = REC.timeOn(e, date), at = REC.ilToMs(date, tm), fire = at - Math.max(Number(e.remind) || 0, 0) * 60000;
+        if (now >= fire && !(await wasFired(`done:${e.id}:${at}`))) pending.push({ eid: e.id, at, title: e.title, date, time: tm, kids: e.kids || [] });
       }
     }
     pending.sort((a, b) => a.at - b.at);

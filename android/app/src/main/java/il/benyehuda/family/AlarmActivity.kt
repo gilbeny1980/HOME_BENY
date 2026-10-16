@@ -79,9 +79,9 @@ class AlarmActivity : AppCompatActivity() {
         for (a in actions) {
             val p = a.split("\u0001")
             if (p.size < 4) continue
-            root.addView(button(p[0], true) { post(p[1], p.getOrElse(2) { "POST" }, p[3], p.getOrElse(4) { "{}" }); finish() })
+            root.addView(button(p[0], true) { post(p[1], p.getOrElse(2) { "POST" }, p[3], p.getOrElse(4) { "{}" }); cancelNote(); finish() })
         }
-        root.addView(button("סגור", false) { finish() })
+        root.addView(button("סגור", false) { cancelNote(); finish() })
         startRinging()
         handler.postDelayed({ stopRinging() }, 3 * 60 * 1000L)
     }
@@ -153,5 +153,10 @@ class AlarmActivity : AppCompatActivity() {
     override fun onDestroy() {
         stopRinging()
         super.onDestroy()
+    }
+
+    private fun cancelNote() {
+        val n = intent.getIntExtra(Alarm.X_NID, -1)
+        if (n >= 0) try { getSystemService(android.app.NotificationManager::class.java).cancel(n) } catch (e: Exception) { }
     }
 }

@@ -53,9 +53,9 @@ function renderToday(){
   const d=new Date(),h=d.getHours();
   $('#greet').textContent=(h<5?'לילה טוב':h<12?'בוקר טוב':h<18?'צהריים טובים':h<22?'ערב טוב':'לילה טוב')+(myName?', '+myName+' 👋':' משפחת בן יהודה');
   const t=iso(d),hm=`${pad(h)}:${pad(d.getMinutes())}`;
-  const ev=live(db.events).filter(e=>e.date===t).sort((a,b)=>a.time.localeCompare(b.time));
-  const nxt=ev.find(e=>e.time>=hm);
-  $('#todaySum').textContent=ev.length?`היום ${ev.length} אירועים`+(nxt?` · הבא: ${nxt.title} ב־${nxt.time}`:''):'';
+  const ev=live(db.events).filter(e=>REC.occursOn(e,t)).sort((a,b)=>REC.timeOn(a,t).localeCompare(REC.timeOn(b,t)));
+  const nxt=ev.find(e=>REC.timeOn(e,t)>=hm);
+  $('#todaySum').textContent=ev.length?`היום ${ev.length} אירועים`+(nxt?` · הבא: ${nxt.title} ב־${REC.timeOn(nxt,t)}`:''):'';
 }
 tick();setInterval(tick,1000);setInterval(()=>{renderToday();renderKids()},30000);
 let kidsBuilt=false;
@@ -100,8 +100,8 @@ function renderCal(){
     h+=`<button class="day ${d.getMonth()!==m?'out':''} ${k===today?'today':''} ${k===sel?'sel':''}" data-d="${k}"><span class="dn">${d.getDate()}</span><span class="dt">${shown}</span></button>`}
   $('#days').innerHTML=h;
   $('#selLabel').textContent=fmtDate(sel);
-  const ev=evs.filter(e=>REC.occursOn(e,sel)).sort((a,b)=>a.time.localeCompare(b.time));
-  $('#eventList').innerHTML=ev.length?ev.map(e=>`<li class="item" style="--c:${evKids(e).length?kidColor(evKids(e)[0]):'var(--b1)'}"><div class="avatar" style="background:${kidBg(evKids(e))}">${esc(e.time)}</div><div class="main"><b>${esc(e.title)}${kidTags(evKids(e))}</b><small>${e.req?'❗ דורש אישור ביצוע · ':''}${e.rep?'🔁 '+REC.LABEL[e.rep]+(e.until?' עד '+e.until:'')+' · ':''}${e.nag?'🔂 כל '+e.nag+' דק׳ · ':''}${e.remind>=0?'🔔 '+$('#eventForm [name=remind] option[value="'+e.remind+'"]').textContent:'ללא תזכורת'}</small></div>${e.img?`<img class="evImg" data-img="${e.img}" alt="תמונה">`:''}${adminTok?`<button class="share" data-ed="${e.id}" title="עריכה">✏️</button>`:''}<button class="share" data-s="${e.id}" title="שלח תזכורת">📤</button><button class="del" data-id="${e.id}">🗑</button></li>`).join(''):'<li class="empty">אין אירועים ביום זה</li>';
+  const ev=evs.filter(e=>REC.occursOn(e,sel)).sort((a,b)=>REC.timeOn(a,sel).localeCompare(REC.timeOn(b,sel)));
+  $('#eventList').innerHTML=ev.length?ev.map(e=>`<li class="item" style="--c:${evKids(e).length?kidColor(evKids(e)[0]):'var(--b1)'}"><div class="avatar" style="background:${kidBg(evKids(e))}">${esc(REC.timeOn(e,sel))}</div><div class="main"><b>${esc(e.title)}${kidTags(evKids(e))}</b><small>${e.req?'❗ דורש אישור ביצוע · ':''}${e.rep?'🔁 '+repText(e)+(e.until?' עד '+e.until:'')+' · ':''}${e.nag?'🔂 כל '+e.nag+' דק׳ · ':''}${e.remind>=0?'🔔 '+$('#eventForm [name=remind] option[value="'+e.remind+'"]').textContent:'ללא תזכורת'}</small></div>${e.img?`<img class="evImg" data-img="${e.img}" alt="תמונה">`:''}${adminTok?`<button class="share" data-ed="${e.id}" title="עריכה">✏️</button>`:''}<button class="share" data-s="${e.id}" title="שלח תזכורת">📤</button><button class="del" data-id="${e.id}">🗑</button></li>`).join(''):'<li class="empty">אין אירועים ביום זה</li>';
   const tk=adminTok?live(db.tasks).filter(t=>t.due===sel):[];
   $('#dayTasksH').hidden=!tk.length;
   $('#dayTasks').innerHTML=tk.map(t=>`<li class="item ${t.done?'done':''}" style="--c:${t.who?kidColor(t.who):'var(--b1)'}"><div class="avatar">${t.done?'✓':'☐'}</div><div class="main"><b>${esc(t.title)}${t.who?`<span class="tag" style="--c:${kidColor(t.who)}">${esc(t.who)}</span>`:''}</b></div></li>`).join('');
@@ -116,7 +116,10 @@ $('#eventForm').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.tar
   if(pendingImg){try{const r=await fetch('/api/image',{method:'POST',headers:hdr(),body:JSON.stringify({data:pendingImg})});if(r.ok)imgId=(await r.json()).id;else toast('העלאת התמונה נכשלה')}catch{toast('העלאת התמונה נכשלה')}}
   if(origImg&&imgId!==origImg)fetch('/api/image?id='+origImg,{method:'DELETE',headers:hdr()}).catch(()=>{});
   const tm=f.get('time')||'00:00',rep=f.get('rep')||'';let saved=null;
-  const data={req:!!f.get('req'),title:f.get('title'),date:f.get('date'),time:tm,kids:f.getAll('ekids'),img:imgId,rep,nag:+f.get('nag')||0,until:rep?(f.get('until')||''):'',at:new Date(`${f.get('date')}T${tm}`).getTime(),remind:+f.get('remind')};
+  const days=rep==='dow'?f.getAll('days').map(Number):[];
+  if(rep==='dow'&&!days.length){toast('סמן לפחות יום אחד בשבוע');return}
+  const dt={};for(const d of days)if(curDT[d]&&curDT[d]!==tm)dt[d]=curDT[d];
+  const data={days:rep==='dow'?days:null,dtimes:rep==='dow'&&Object.keys(dt).length?dt:null,req:!!f.get('req'),title:f.get('title'),date:f.get('date'),time:tm,kids:f.getAll('ekids'),img:imgId,rep,nag:+f.get('nag')||0,until:rep?(f.get('until')||''):'',at:new Date(`${f.get('date')}T${tm}`).getTime(),remind:+f.get('remind')};
   if(editEv){const x=db.events.find(v=>v.id===editEv);if(x){Object.assign(x,data);delete x.kid;touch(x)}}else{saved=touch({id:uid(),...data});db.events.push(saved)}
   sel=f.get('date');save();editEv='';clearImg();$('#eventModal').hidden=true;renderCal();checkReminders();
   if(saved&&f.get('wa'))setTimeout(()=>shareEvent(saved),300);
@@ -179,9 +182,9 @@ function checkReminders(){
   const dd=n=>iso(new Date(now+n*864e5));
   for(const e of live(db.events)){if(!(e.remind>=0))continue;
     for(const d of [dd(-1),dd(0),dd(1)]){if(!REC.occursOn(e,d))continue;
-      const at=new Date(`${d}T${e.time}`).getTime(),fire=at-e.remind*60000,key=e.id+':'+at;
+      const at=new Date(`${d}T${REC.timeOn(e,d)}`).getTime(),fire=at-e.remind*60000,key=e.id+':'+at;
       if(now>=fire&&now<at+3600000&&!db.fired[key]){db.fired[key]=1;ch=true;
-        const ks=evKids(e);notify('תזכורת: '+e.title+(ks.length?' ('+ks.join(', ')+')':''),`${fmtDate(d)} בשעה ${e.time}`)}}}
+        const ks=evKids(e);notify('תזכורת: '+e.title+(ks.length?' ('+ks.join(', ')+')':''),`${fmtDate(d)} בשעה ${REC.timeOn(e,d)}`)}}}
   const today=iso(new Date());
   if(!db.fired['d'+today]&&new Date().getHours()>=8){const n=!adminTok?0:live(db.tasks).filter(t=>!t.done&&t.due&&t.due<=today).length;
     if(n){db.fired['d'+today]=1;ch=true;notify('משימות להיום',`יש ${n} משימות פתוחות להיום או באיחור`)}}
@@ -332,7 +335,7 @@ async function testPush(){
   }catch(e){toast('שגיאה: '+(e.message||e))}
 }
 
-$('#repSel').onchange=e=>{$('#untilWrap').hidden=!e.target.value};
+$('#repSel').onchange=e=>{$('#untilWrap').hidden=!e.target.value;$('#dowBox').hidden=e.target.value!=='dow'};
 
 function renderAdminContacts(){
   const l=live(db.contacts).sort((x,y)=>x.name.localeCompare(y.name,'he'));
@@ -357,24 +360,41 @@ function showRemind(r){showAlarm(r)}
 if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',ev=>{const d=ev.data||{};if(d.type==='ring')d.r&&d.r.t?showAlarm(d.r):beep();if(d.type==='remind')showRemind(d.r)});
 try{const q=new URLSearchParams(location.search).get('r');if(q){showRemind(JSON.parse(q));history.replaceState(null,'',location.pathname)}}catch{}
 
-// בחירת שעה: שתי רשימות + כפתורי שעות מהירות
-(function(){
-  const H=$('#evH'),M=$('#evM'),T=$('#eventForm [name=time]');
-  H.innerHTML=Array.from({length:24},(_,i)=>`<option>${pad(i)}</option>`).join('');
-  M.innerHTML=Array.from({length:60},(_,i)=>`<option>${pad(i)}</option>`).join('');
-  const set=v=>{const [h,m]=v.split(':');H.value=h;M.value=m;T.value=v};window.setEvTime=set;
-  set(T.value);
-  H.onchange=M.onchange=()=>{T.value=H.value+':'+M.value};
-  const Q=['07:00','08:00','09:00','12:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00'];
-  $('#timeChips').innerHTML=Q.map(q=>`<button type="button" class="qt" data-q="${q}">${q}</button>`).join('');
-  $('#timeChips').onclick=e=>{const b=e.target.closest('[data-q]');if(b)set(b.dataset.q)};
-})();
+// בחירת שעה: שדה אחד (כמו התאריך); לחיצה פותחת חלון בחירה
+let curDT={};
+function openTimePicker(init,cb){
+  let [h,m]=(init||'18:00').split(':').map(Number);
+  const show=()=>{$('#tmDisplay').textContent=pad(h)+':'+pad(m);
+    $$('#tmHours button').forEach(b=>b.classList.toggle('on',+b.dataset.v===h));
+    $$('#tmMins button').forEach(b=>b.classList.toggle('on',+b.dataset.v===m))};
+  $('#tmHours').innerHTML=Array.from({length:24},(_,i)=>`<button type="button" data-v="${i}">${pad(i)}</button>`).join('');
+  $('#tmMins').innerHTML=Array.from({length:12},(_,i)=>`<button type="button" data-v="${i*5}">${pad(i*5)}</button>`).join('');
+  $('#tmHours').onclick=e=>{const b=e.target.closest('[data-v]');if(b){h=+b.dataset.v;show()}};
+  $('#tmMins').onclick=e=>{const b=e.target.closest('[data-v]');if(b){m=+b.dataset.v;show()}};
+  const step=d=>{let t=h*60+m+d;t=(t%1440+1440)%1440;h=Math.floor(t/60);m=t%60;show()};
+  $('#tmMinus').onclick=()=>step(-1);$('#tmPlus').onclick=()=>step(1);
+  $('#tmOk').onclick=()=>{$('#timeModal').hidden=true;cb(pad(h)+':'+pad(m))};
+  $('#timeModal').onclick=e=>{if(e.target.id==='timeModal')$('#timeModal').hidden=true};
+  show();$('#timeModal').hidden=false;
+}
+function setEvTime(v){$('#eventForm [name=time]').value=v;$('#timeBtn').textContent=v;renderDow()}
+$('#timeBtn').onclick=()=>openTimePicker($('#eventForm [name=time]').value,setEvTime);
+const DAYN=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+function renderDow(){
+  const main=$('#eventForm [name=time]').value||'18:00';
+  const keep=[...$$('#dowDays input:checked')].map(i=>+i.value);
+  $('#dowDays').innerHTML=DAYN.map((n,i)=>`<div class="dowRow"><label class="ck"><input type="checkbox" name="days" value="${i}" ${keep.includes(i)?'checked':''}><span>${n}</span></label><button type="button" class="dtBtn ${curDT[i]?'ov':''}" data-d="${i}">${curDT[i]||main}</button></div>`).join('');
+}
+$('#dowDays').onclick=e=>{const b=e.target.closest('.dtBtn');if(!b)return;const d=+b.dataset.d,main=$('#eventForm [name=time]').value;
+  openTimePicker(curDT[d]||main,v=>{if(v===main)delete curDT[d];else curDT[d]=v;const cb=$('#dowDays input[value="'+d+'"]');if(cb)cb.checked=true;renderDow()})};
+const repText=e=>e.rep==='dow'?'ימים: '+(e.days||[]).map(i=>REC.DOW[i]).join(' '):REC.LABEL[e.rep];
 function openEventForm(ev){
   const f=$('#eventForm');editEv=ev?ev.id:'';clearImg();curImg=origImg=ev&&ev.img||'';
   f.querySelector('h3').textContent=ev?'עריכת אירוע':'אירוע חדש';$('#eventSave').textContent=ev?'שמור שינויים':'＋ הוסף ללוח';
   f.title.value=ev?ev.title:'';f.date.value=ev?ev.date:sel;setEvTime(ev?ev.time:'18:00');
   $$('#evKids input').forEach(i=>i.checked=ev?evKids(ev).includes(i.value):false);
-  f.rep.value=ev?(ev.rep||''):'';$('#untilWrap').hidden=!(ev&&ev.rep);f.until.value=ev&&ev.until||'';
+  f.rep.value=ev?(ev.rep||''):'';$('#untilWrap').hidden=!(ev&&ev.rep);$('#dowBox').hidden=!(ev&&ev.rep==='dow');f.until.value=ev&&ev.until||'';
+  curDT=ev&&ev.dtimes?{...ev.dtimes}:{};renderDow();$$('#dowDays input').forEach(i=>i.checked=!!(ev&&ev.rep==='dow'&&(ev.days||[]).includes(+i.value)));
   f.req.checked=!!(ev&&ev.req);f.remind.value=ev?String(ev.remind):'60';f.nag.value=ev?String(ev.nag||0):'2';
   if(curImg)getImg(curImg).then(d=>{if(d&&editEv===ev.id){$('#evImgThumb').src=d;$('#evImgPrev').hidden=false}});
   $('#eventModal').hidden=false;if(!ev)setTimeout(()=>f.title.focus(),50);
@@ -420,8 +440,8 @@ function nextDate(e){const t=iso(new Date());if(!e.rep)return e.date;const far=i
 function renderAdminEvents(){
   if(!adminTok){$('#adminEvents').innerHTML='';return}
   const t=iso(new Date());
-  const l=live(db.events).map(e=>({e,d:nextDate(e)})).sort((x,y)=>(x.d<t)-(y.d<t)||x.d.localeCompare(y.d)||x.e.time.localeCompare(y.e.time));
-  $('#adminEvents').innerHTML=l.length?l.map(({e,d})=>`<li class="item ${d<t?'done':''}" style="--c:${evKids(e).length?kidColor(evKids(e)[0]):'var(--b1)'}"><div class="avatar" style="background:${kidBg(evKids(e))}">${esc(e.time)}</div><div class="main"><b>${esc(e.title)}${kidTags(evKids(e))}</b><small>${e.req?'❗ דורש אישור · ':''}${fmtDate(d)}${e.rep?' · 🔁 '+REC.LABEL[e.rep]:''}</small></div><button class="share" data-nt="${e.id}" title="שלח עכשיו">🔔</button><button class="share" data-ed="${e.id}" title="עריכה">✏️</button><button class="del" data-xd="${e.id}">🗑</button></li>`).join(''):'<li class="empty">אין אירועים</li>';
+  const l=live(db.events).map(e=>({e,d:nextDate(e)})).sort((x,y)=>(x.d<t)-(y.d<t)||x.d.localeCompare(y.d)||REC.timeOn(x.e,x.d).localeCompare(REC.timeOn(y.e,y.d)));
+  $('#adminEvents').innerHTML=l.length?l.map(({e,d})=>`<li class="item ${d<t?'done':''}" style="--c:${evKids(e).length?kidColor(evKids(e)[0]):'var(--b1)'}"><div class="avatar" style="background:${kidBg(evKids(e))}">${esc(REC.timeOn(e,d))}</div><div class="main"><b>${esc(e.title)}${kidTags(evKids(e))}</b><small>${e.req?'❗ דורש אישור · ':''}${fmtDate(d)}${e.rep?' · 🔁 '+repText(e):''}</small></div><button class="share" data-nt="${e.id}" title="שלח עכשיו">🔔</button><button class="share" data-ed="${e.id}" title="עריכה">✏️</button><button class="del" data-xd="${e.id}">🗑</button></li>`).join(''):'<li class="empty">אין אירועים</li>';
 }
 $('#adminEvents').onclick=e=>{
   const nt=e.target.closest('[data-nt]');if(nt)return sendNow(nt.dataset.nt);

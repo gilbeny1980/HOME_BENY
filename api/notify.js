@@ -22,7 +22,7 @@ module.exports = async (req, res) => {
     const date = (e.rep ? (ds.find(d => d >= t) || ds[ds.length - 1]) : e.date) || e.date;
     const clean = v => String(v || '').replace(/[^A-Za-z0-9_-]/g, '');
     webpush.setVapidDetails((process.env.VAPID_SUBJECT || 'mailto:admin@example.com').trim(), clean(process.env.VAPID_PUBLIC_KEY), clean(process.env.VAPID_PRIVATE_KEY));
-    const payload = JSON.stringify({ title: 'תזכורת: ' + e.title + (kids.length ? ` (${kids.join(', ')})` : ''), body: `${date} בשעה ${e.time}`, eid: e.id, at: REC.ilToMs(date, e.time) });
+    const payload = JSON.stringify({ title: 'תזכורת: ' + e.title + (kids.length ? ` (${kids.join(', ')})` : ''), body: `${date} בשעה ${REC.timeOn(e, date)}`, eid: e.id, at: REC.ilToMs(date, REC.timeOn(e, date)) });
     let sent = 0; const fails = [];
     for (const { sub, uname } of await subsAll()) {
       if (to && uname && uname !== 'admin' && !to.includes(uname)) continue;

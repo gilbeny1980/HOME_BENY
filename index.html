@@ -160,17 +160,20 @@
       </div>
       <label class="lbl">תאריך<input name="date" type="date" required></label>
       <div class="lbl">שעה</div>
-      <div class="timeRow" dir="ltr"><select id="evH" aria-label="שעה"></select><b>:</b><select id="evM" aria-label="דקות"></select></div>
-      <div id="timeChips" class="chipsRow"></div>
+      <button type="button" id="timeBtn" class="fieldBtn">18:00</button>
       <input type="hidden" name="time" value="18:00">
       <div class="lbl">עבור (אפשר כמה · ריק = כולם)</div>
       <div id="evKids" class="checks"></div>
       <label class="lbl">חזרה
         <select name="rep" id="repSel">
-          <option value="">ללא חזרה</option><option value="d">כל יום</option><option value="w">כל שבוע</option>
+          <option value="">ללא חזרה</option><option value="d">כל יום</option><option value="dow">כל יום – לבחור ימים ושעות</option><option value="w">כל שבוע</option>
           <option value="2w">כל שבועיים</option><option value="m">כל חודש</option><option value="y">כל שנה</option>
         </select>
       </label>
+      <div id="dowBox" hidden>
+        <div class="lbl" style="margin-bottom:6px">סמן את הימים. לחיצה על השעה ליד יום משנה את השעה של אותו יום (למשל מאוחר יותר בשבת)</div>
+        <div id="dowDays" class="dowGrid"></div>
+      </div>
       <label class="lbl" id="untilWrap" hidden>חוזר עד תאריך (לא חובה)<input name="until" type="date"></label>
       <label class="lbl">תזכורת
         <select name="remind">
@@ -215,6 +218,16 @@
     <p id="alarmHint" class="alarmHint" hidden>🔇 אין צליל? לחץ על המסך</p>
     <button class="btn gold" id="alarmSnooze" type="button">⏰ נודניק 10 דקות</button>
     <button class="btn" id="alarmStop" type="button">✔ הבנתי – הפסק</button>
+  </div>
+</div>
+<div id="timeModal" class="sheet" hidden style="z-index:12">
+  <div class="sheetBox">
+    <h3>בחירת שעה</h3>
+    <div id="tmDisplay" class="tmDisplay" dir="ltr">18:00</div>
+    <div class="lbl">שעה</div><div id="tmHours" class="tmGrid" dir="ltr"></div>
+    <div class="lbl" style="margin-top:10px">דקות</div><div id="tmMins" class="tmGrid" dir="ltr"></div>
+    <div class="row" style="margin:10px 0"><button type="button" id="tmMinus" class="btn ghost" style="margin:0">−1 דקה</button><button type="button" id="tmPlus" class="btn ghost" style="margin:0">+1 דקה</button></div>
+    <button type="button" id="tmOk" class="btn">אישור</button>
   </div>
 </div>
 <div id="iosHint" class="toast hint" hidden>באייפון: לחצו על ⬆️ שיתוף ← "הוסף למסך הבית"</div>
