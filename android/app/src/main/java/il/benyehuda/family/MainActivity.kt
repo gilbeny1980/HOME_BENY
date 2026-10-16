@@ -115,6 +115,10 @@ class MainActivity : AppCompatActivity() {
 
     inner class Bridge {
         @JavascriptInterface fun hasApp(): Boolean = true
+        @JavascriptInterface fun version(): String = try { packageManager.getPackageInfo(packageName, 0).versionName ?: "" } catch (e: Exception) { "" }
+        @JavascriptInterface fun update() {
+            runOnUiThread { try { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(Prefs.SITE + "/downloads/benyehuda.apk"))) } catch (e: Exception) { } }
+        }
 
         @JavascriptInterface fun setSound(name: String) { Prefs.setSound(this@MainActivity, name.filter { it.isLetterOrDigit() || it == '_' }.ifEmpty { "sms" }) }
 
