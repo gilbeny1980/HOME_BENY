@@ -51,7 +51,8 @@ def render(notes, kind, harm, gain, echo):
     return out
 
 def js_table():
-    rows = []
+    # the user's own recording (served from /sounds, bundled as res/raw/tone_sms.mp3)
+    rows = ["  sms:['הצליל שלי – SMS 💬',[],'sine',[[1,1]],1,false,'/sounds/sms.mp3'],"]
     for k, (name, notes, kind, harm, gain, echo) in TONES.items():
         rows.append("  %s:[%s,%s,'%s',%s,%s,%s]," % (k, json.dumps(name, ensure_ascii=False), json.dumps(notes), kind, json.dumps(harm), gain, 'true' if echo else 'false'))
     rows.append("  silent:['שקט (בלי צליל)',[],'sine',[[1,1]],0]")

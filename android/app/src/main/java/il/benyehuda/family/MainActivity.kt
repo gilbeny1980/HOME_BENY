@@ -116,7 +116,7 @@ class MainActivity : AppCompatActivity() {
     inner class Bridge {
         @JavascriptInterface fun hasApp(): Boolean = true
 
-        @JavascriptInterface fun setSound(name: String) { Prefs.setSound(this@MainActivity, name.filter { it.isLetterOrDigit() || it == '_' }.ifEmpty { "msg" }) }
+        @JavascriptInterface fun setSound(name: String) { Prefs.setSound(this@MainActivity, name.filter { it.isLetterOrDigit() || it == '_' }.ifEmpty { "sms" }) }
 
         /** true when the phone is in dark mode (the WebView does not always report it to the page by itself) */
         @JavascriptInterface fun isDark(): Boolean =

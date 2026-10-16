@@ -138,6 +138,7 @@ $('#eventList').onclick=e=>{const im=e.target.closest('.evImg');if(im)return sho
 // צליל התראה: צליל הודעה מודרני ועדין (שלושה צלילים עולים, קצת "זכוכית" והד קצר)
 const GLASS=[[1,1],[2,.28],[3,.1],[4.1,.04]];
 const TONES={
+  sms:['הצליל שלי – SMS 💬',[],'sine',[[1,1]],1,false,'/sounds/sms.mp3'],
   msg:["הודעה חדשה ✨",[[659, 0, 0.55], [988, 0.11, 0.6], [1319, 0.24, 1.1]],'sine',[[1, 1], [2, 0.28], [3, 0.1], [4.1, 0.04]],0.34,true],
   bubble:["בועה 🫧",[[520, 0, 0.16, 1040], [700, 0.14, 0.18, 1400], [880, 0.3, 0.3, 1760]],'sine',[[1, 1], [2, 0.15]],0.4,false],
   drop:["טיפה 💧",[[1760, 0, 0.45, 1100], [1320, 0.32, 0.5, 880]],'sine',[[1, 1], [2, 0.2]],0.36,true],
@@ -148,11 +149,18 @@ const TONES={
   marimba:["מרימבה 🥁",[[784, 0, 0.3], [988, 0.14, 0.3], [1318, 0.28, 0.3], [1568, 0.42, 0.55]],'sine',[[1, 1], [4, 0.22]],0.4,false],
   silent:['שקט (בלי צליל)',[],'sine',[[1,1]],0]
 };
-let tone=localStorage.getItem('bny-tone');if(!TONES[tone])tone='msg';
+let tone=localStorage.getItem('bny-tone');if(!TONES[tone])tone='sms';
 let AC;function ctx(){AC=AC||new (window.AudioContext||window.webkitAudioContext)();if(AC.state==='suspended')AC.resume();return AC}
 ['pointerdown','touchstart','keydown'].forEach(ev=>addEventListener(ev,()=>{try{ctx()}catch{}},{once:true,passive:true}));
 let vol=parseFloat(localStorage.getItem('bny-vol')||'1');if(!(vol>0&&vol<=1))vol=1;
-function playTone(name){try{const t=TONES[name]||TONES.msg;if(!t[1].length)return;
+const toneBufs={};
+async function playFile(url){
+  const c=ctx(),master=c.createGain(),comp=c.createDynamicsCompressor();master.gain.value=Math.min(1,vol);comp.threshold.value=-1;comp.knee.value=0;comp.ratio.value=20;master.connect(comp);comp.connect(c.destination);
+  try{if(!toneBufs[url])toneBufs[url]=await c.decodeAudioData(await (await fetch(url)).arrayBuffer());
+    const src=c.createBufferSource();src.buffer=toneBufs[url];src.connect(master);src.start()}
+  catch{try{const au=new Audio(url);au.volume=Math.min(1,vol);au.play()}catch{}}
+}
+function playTone(name){try{const t=TONES[name]||TONES.msg;if(t[6]){playFile(t[6]);return}if(!t[1].length)return;
   const c=ctx(),master=c.createGain(),comp=c.createDynamicsCompressor();master.gain.value=vol*3;comp.threshold.value=-4;comp.knee.value=0;comp.ratio.value=20;comp.attack.value=0;comp.release.value=.15;master.connect(comp);comp.connect(c.destination);
   let echo=null;
   if(t[5]){echo=c.createDelay(.6);echo.delayTime.value=.22;const fb=c.createGain();fb.gain.value=.32;const wet=c.createGain();wet.gain.value=.5;echo.connect(fb);fb.connect(echo);echo.connect(wet);wet.connect(master)}
@@ -376,11 +384,13 @@ $('#eventModal').onclick=e=>{if(e.target.id==='eventModal')$('#eventModal').hidd
 
 // מסך התראה מלא עם צלצול מתמשך (עד "הבנתי" / נודניק, או עד 3 דקות)
 let alarmT=null,alarmAuto=null,alarmR=null;
-function stopRing(){clearInterval(alarmT);clearTimeout(alarmAuto);alarmT=alarmAuto=null;if(navigator.vibrate)navigator.vibrate(0)}
+function stopRing(){clearTimeout(alarmT);clearTimeout(alarmAuto);alarmT=alarmAuto=null;if(navigator.vibrate)navigator.vibrate(0)}
 function showAlarm(r){
   alarmR=r;const conf=!!r.q&&isParent();$('#alarmSnooze').hidden=false;$('#alarmStop').textContent=r.q?(conf?'✔ בוצע – אישרתי':'הבנתי'):'✔ הבנתי – הפסק';$('#alarmTitle').textContent=r.t||'תזכורת';$('#alarmBody').textContent=r.b||'';$('#alarm').hidden=false;
   stopRing();$('#alarmHint').hidden=!!(AC&&AC.state==='running');$('#alarmHint').style.visibility='visible';const go=()=>{playTone(tone);if(navigator.vibrate)navigator.vibrate([500,200,500,200,500])};
-  go();if(localStorage.getItem('bny-loop')!=='0')alarmT=setInterval(go,3000);
+  const gap=()=>{const t=TONES[tone];return t&&t[6]&&toneBufs[t[6]]?toneBufs[t[6]].duration*1000+400:3000};
+  const again=()=>{alarmT=setTimeout(()=>{go();again()},gap())};
+  go();if(localStorage.getItem('bny-loop')!=='0')again();
   alarmAuto=setTimeout(stopRing,180000);
 }
 $('#alarmStop').onclick=()=>{stopRing();$('#alarm').hidden=true;const r=alarmR||{};if(!r.e)return;
