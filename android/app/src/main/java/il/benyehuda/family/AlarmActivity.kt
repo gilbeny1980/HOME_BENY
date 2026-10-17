@@ -81,7 +81,7 @@ class AlarmActivity : AppCompatActivity() {
             if (p.size < 4) continue
             root.addView(button(p[0], true) { post(p[1], p.getOrElse(2) { "POST" }, p[3], p.getOrElse(4) { "{}" }); cancelNote(); finish() })
         }
-        root.addView(button("סגור", false) { cancelNote(); finish() })
+        root.addView(button("סגור", false) { cancelNote(); finishAndRemoveTask() })
         startRinging()
         handler.postDelayed({ stopRinging() }, 3 * 60 * 1000L)
     }
@@ -148,6 +148,13 @@ class AlarmActivity : AppCompatActivity() {
         try { player?.stop(); player?.release() } catch (e: Exception) { }
         player = null
         try { (getSystemService(Context.VIBRATOR_SERVICE) as Vibrator).cancel() } catch (e: Exception) { }
+    }
+
+    /** If the user leaves this screen while the phone is on (home / another app / app switcher), stop and close – never leave a ringing ghost behind. */
+    override fun onStop() {
+        super.onStop()
+        val pm = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+        if (pm.isInteractive) { stopRinging(); finishAndRemoveTask() }
     }
 
     override fun onDestroy() {
